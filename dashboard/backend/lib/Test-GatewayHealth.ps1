@@ -1,0 +1,99 @@
+﻿# Test-GatewayHealth.ps1
+# Check LiteLLM gateway health and log to database
+
+<#
+.SYNOPSIS
+    Tests LiteLLM gateway health and logs results to dashboard database
+
+.DESCRIPTION
+    Pings the LiteLLM gateway health endpoint and records:
+    - Gateway status (up/down/degraded)
+    - Available models
+    - Response time
+    - Any errors
+
+.EXAMPLE
+    Test-GatewayHealth
+#>
+
+[CmdletBinding()]
+param(
+    [string]$Endpoint = "http://localhost:4000/health",
+    [string]$DatabasePath = "$PSScriptRoot\..\..\data\dashboard.db"
+)
+
+function Write-GatewayHealthLog {
+    param(
+        [string]$DbPath,
+        [hashtable]$Data
+    )
+
+    try {
+        $sqliteExe = Get-Command sqlite3 -ErrorAction SilentlyContinue
+
+        if ($sqliteExe) {
+            $escapedStatus = $Data.status -replace "'", "''"
+            $escapedModels = if ($Data.models) { "`"$($Data.models -replace "'", "''")`"" } else { "NULL" }
+            $escapedError = if ($Data.error) { "`"$($Data.error -replace "'", "''")`"" } else { "NULL" }
+
+            $sql = @"
+            INSERT INTO gateway_health (gateway_status, models_available, response_time_ms, endpoint, error_message)
+            VALUES ('$escapedStatus', $escapedModels, $($Data.response_time), '$($Data.endpoint)', $escapedError);
+"@
+
+            & sqlite3 $DbPath $sql 2>&1 | Out-Null
+        }
+        else {
+            # CSV fallback
+            $csvPath = $DbPath -replace '\.db$', '_gateway_health.csv'
+            $csvLine = "$($Data.timestamp),$($Data.status),$($Data.models),$($Data.response_time),$($Data.endpoint),`"$($Data.error)`""
+            Add-Content -Path $csvPath -Value $csvLine
+        }
+    }
+    catch {
+        # Silently fail
+    }
+}
+
+try {
+    $startTime = Get-Date
+    $status = "up"
+    $models = $null
+    $responseTime = $null
+    $error = $null
+
+    try {
+        # Test gateway health
+        $response = Invoke-RestMethod -Uri $Endpoint -TimeoutSec 5 -ErrorAction Stop
+        $responseTime = ((Get-Date) - $startTime).TotalMilliseconds
+
+        # Extract available models if response has them
+        if ($response.models) {
+            $models = ($response.models | ConvertTo-Json -Compress)
+        }
+
+        Write-Host "[OK] Gateway is UP ($responseTime ms)" -ForegroundColor Green
+    }
+    catch {
+        $status = "down"
+        $error = $_.Exception.Message
+        $responseTime = $null
+
+        Write-Host "[FAIL] Gateway is DOWN: $error" -ForegroundColor Red
+    }
+
+    # Log to database
+    $logData = @{
+        timestamp = (Get-Date).ToString("o")
+        gateway_status = $status
+        models_available = $models
+        response_time = $responseTime
+        endpoint = $Endpoint
+        error = $error
+    }
+
+    Write-GatewayHealthLog -DbPath $DatabasePath -Data $logData
+}
+catch {
+    Write-Host "[FAIL] Error: $($_.Exception.Message)" -ForegroundColor Red
+}

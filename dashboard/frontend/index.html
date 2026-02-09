@@ -1,0 +1,2763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Council Observability Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --border-color: #30363d;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-yellow: #d29922;
+            --accent-blue: #58a6ff;
+            --accent-purple: #a371f7;
+            --tab-active-bg: #1f242c;
+            --tab-active-border: #58a6ff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        header {
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.healthy {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+        }
+
+        .status-badge.unhealthy {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        select, button {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        select:hover, button:hover {
+            border-color: var(--text-secondary);
+        }
+
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            gap: 5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-blue);
+            border-bottom-color: var(--accent-blue);
+        }
+
+        /* Tab Panels */
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        /* Dashboard Tab Styles */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 8px 0;
+        }
+
+        .stat-change {
+            font-size: 12px;
+        }
+
+        .stat-change.positive { color: var(--accent-green); }
+        .stat-change.negative { color: var(--accent-red); }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 900px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .table-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+
+        tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .model-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .model-tier-1 { background: rgba(88, 166, 255, 0.15); color: var(--accent-blue); }
+        .model-tier-2 { background: rgba(163, 113, 247, 0.15); color: var(--accent-purple); }
+        .model-tier-3 { background: rgba(63, 185, 80, 0.15); color: var(--accent-green); }
+        .model-tier-4 { background: rgba(210, 153, 34, 0.15); color: var(--accent-yellow); }
+
+        .tool-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Gateway Logs Tab Styles */
+        .log-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .log-filter-btn {
+            padding: 6px 12px;
+            border: 1px solid #444;
+            background: #1a1a2e;
+            color: #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .log-filter-btn:hover {
+            background: #2a2a4e;
+        }
+
+        .log-filter-btn.active {
+            background: #4a4a8e;
+            color: white;
+        }
+
+        .log-filter-btn[data-level="ERROR"].active {
+            background: #8b2020;
+        }
+
+        .log-filter-btn[data-level="WARNING"].active {
+            background: #8b6a20;
+        }
+
+        .log-filter-btn[data-level="INFO"].active {
+            background: #208b40;
+        }
+
+        .log-search {
+            flex: 1;
+            min-width: 200px;
+            padding: 6px 10px;
+            border: 1px solid #444;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-radius: 4px;
+        }
+
+        .log-container {
+            background: #0d0d1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            height: 500px;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+        }
+
+        .log-container.auto-scroll {
+            scroll-behavior: smooth;
+        }
+
+        .log-entry {
+            padding: 4px 8px;
+            border-bottom: 1px solid #1a1a2e;
+            display: flex;
+            gap: 10px;
+            transition: background 0.1s;
+        }
+
+        .log-entry:hover {
+            background: #15152e;
+        }
+
+        .log-entry.ERROR {
+            background: rgba(139, 32, 32, 0.2);
+            border-left: 3px solid #c04040;
+        }
+
+        .log-entry.WARNING {
+            background: rgba(139, 106, 32, 0.15);
+            border-left: 3px solid #c0a040;
+        }
+
+        .log-entry.INFO {
+            border-left: 3px solid #40c060;
+        }
+
+        .log-timestamp {
+            color: #666;
+            min-width: 140px;
+            flex-shrink: 0;
+        }
+
+        .log-level {
+            min-width: 60px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .log-level.ERROR { color: #ff6060; }
+        .log-level.WARNING { color: #ffc060; }
+        .log-level.INFO { color: #60c080; }
+        .log-level.DEBUG { color: #60a0ff; }
+
+        .log-message {
+            flex: 1;
+            word-break: break-word;
+            color: #ddd;
+        }
+
+        .log-stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .log-stat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .log-stat-label {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .log-stat-value {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .log-stat-value.ERROR { color: #ff6060; }
+        .log-stat-value.WARNING { color: #ffc060; }
+        .log-stat-value.INFO { color: #60c080; }
+
+        .connection-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .connection-indicator.connected {
+            background: rgba(32, 139, 64, 0.3);
+            color: #60c080;
+        }
+
+        .connection-indicator.disconnected {
+            background: rgba(139, 32, 32, 0.3);
+            color: #c04040;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+            gap: 10px;
+        }
+
+        /* Pricing Tab Styles */
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--text-primary);
+        }
+
+        .tier-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .tier-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .tier-card h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: var(--accent-blue);
+        }
+
+        .tier-card .tier-name {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        .tier-card .cost-range {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .tier-card .cost-range .currency {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .tier-card .models {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .tier-card .models code {
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+        }
+
+        .pricing-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .pricing-table thead {
+            background: var(--bg-tertiary);
+        }
+
+        .pricing-table th,
+        .pricing-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .pricing-table th {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .pricing-table code {
+            background: var(--bg-tertiary);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+        }
+
+        .price-value {
+            font-weight: 600;
+            color: var(--accent-green);
+        }
+
+        .budget-info {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .budget-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .budget-item {
+            padding: 15px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+        }
+
+        .budget-item .label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .budget-item .value {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .budget-item .value.warning {
+            color: var(--accent-yellow);
+        }
+
+        .budget-item .value.danger {
+            color: var(--accent-red);
+        }
+
+        .provider-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+
+        .provider-badge.anthropic { background: rgba(163, 113, 247, 0.2); color: var(--accent-purple); }
+        .provider-badge.google { background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
+        .provider-badge.deepseek { background: rgba(63, 185, 80, 0.2); color: var(--accent-green); }
+        .provider-badge.moonshot { background: rgba(210, 153, 34, 0.2); color: var(--accent-yellow); }
+        .provider-badge.perplexity { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
+
+        .ruling-notice {
+            background: rgba(88, 166, 255, 0.1);
+            border: 1px solid var(--accent-blue);
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 30px;
+        }
+
+        .ruling-notice strong {
+            color: var(--accent-blue);
+        }
+
+        /* Common Styles */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid var(--accent-red);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+            color: var(--accent-red);
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px 0;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .refresh-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .refresh-indicator.visible {
+            opacity: 1;
+        }
+
+        /* Config Tab Styles */
+        .config-selector {
+            display: flex;
+            gap: 10px;
+        }
+
+        .config-type-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--text);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .config-type-btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .config-type-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .config-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .config-editor-container {
+            margin-top: 10px;
+        }
+
+        .config-editor {
+            width: 100%;
+            min-height: 400px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            background: var(--bg-secondary);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            resize: vertical;
+        }
+
+        .config-editor:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .config-help {
+            margin-top: 10px;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .config-help code {
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+
+        .config-status {
+            margin-top: 8px;
+            font-size: 12px;
+        }
+
+        .config-status.success {
+            color: #4CAF50;
+        }
+
+        .config-status.error {
+            color: #f44336;
+        }
+
+        .validation-results {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        .validation-results h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+
+        .validation-content {
+            font-size: 13px;
+        }
+
+        .validation-content .valid {
+            color: #4CAF50;
+        }
+
+        .validation-content .invalid {
+            color: #f44336;
+        }
+
+        .validation-content .warning {
+            color: #ff9800;
+        }
+
+        .schema-display {
+            margin-top: 20px;
+        }
+
+        .code-block {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+
+        .backups-display {
+            margin-top: 20px;
+        }
+
+        .backups-display table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .backups-display th,
+        .backups-display td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .backups-display th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-primary:hover,
+        .btn-secondary:hover {
+            opacity: 0.9;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <div>
+                    <h1>Council Observability Dashboard</h1>
+                    <small style="color: var(--text-secondary)">Multi-Tiered AI Collaboration System</small>
+                </div>
+                <div class="header-controls">
+                    <div id="connection-status" class="status-badge" title="Dashboard backend connection">
+                        <span class="status-dot"></span>
+                        <span id="connection-text">Connecting...</span>
+                    </div>
+                    <div id="gateway-status" class="status-badge">
+                        <span class="status-dot"></span>
+                        <span>Checking...</span>
+                    </div>
+                    <select id="time-range">
+                        <option value="all">All Time</option>
+                        <option value="24h" selected>Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                    </select>
+                    <button id="export-btn">Export</button>
+                    <button id="refresh-btn">Refresh</button>
+                </div>
+            </div>
+            <!-- Tab Navigation -->
+            <nav class="tab-nav">
+                <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+                <button class="tab-btn" data-tab="logs">Gateway Logs</button>
+                <button class="tab-btn" data-tab="memory">Council Memory</button>
+                <button class="tab-btn" data-tab="pricing">Pricing</button>
+                <button class="tab-btn" data-tab="config">Config</button>
+            </nav>
+        </header>
+
+        <div id="error-container"></div>
+
+        <!-- Dashboard Tab Panel -->
+        <div id="tab-dashboard" class="tab-panel active">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total API Calls</div>
+                    <div class="stat-value" id="stat-calls">-</div>
+                    <div class="stat-change" id="stat-calls-change">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Tokens</div>
+                    <div class="stat-value" id="stat-tokens">-</div>
+                    <div class="stat-change" id="stat-tokens-change">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Cost</div>
+                    <div class="stat-value" id="stat-cost">-</div>
+                    <div class="stat-change" id="stat-cost-change">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Success Rate</div>
+                    <div class="stat-value" id="stat-success">-</div>
+                    <div class="stat-change" id="stat-success-change">-</div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-grid">
+                <div class="chart-card full-width">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Token Usage Over Time</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="tokens-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Calls by Model</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="model-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Cost Distribution</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="cost-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card full-width">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Gateway Response Time</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="latency-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Breakdown Table -->
+            <div class="table-card">
+                <div class="chart-header">
+                    <h3 class="chart-title">Model Breakdown</h3>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Calls</th>
+                            <th>Tokens</th>
+                            <th>Cost</th>
+                            <th>Avg Latency</th>
+                            <th>Success Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody id="model-table-body">
+                        <tr><td colspan="6" class="loading">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Gateway Logs Tab Panel -->
+        <div id="tab-logs" class="tab-panel">
+            <!-- Log Statistics -->
+            <div class="log-stats" id="logStats">
+                <div class="log-stat">
+                    <span class="log-stat-label">Errors</span>
+                    <span class="log-stat-value ERROR" id="errorCount">-</span>
+                </div>
+                <div class="log-stat">
+                    <span class="log-stat-label">Warnings</span>
+                    <span class="log-stat-value WARNING" id="warningCount">-</span>
+                </div>
+                <div class="log-stat">
+                    <span class="log-stat-label">Info</span>
+                    <span class="log-stat-value INFO" id="infoCount">-</span>
+                </div>
+                <div class="log-stat">
+                    <span class="log-stat-label">Last Error</span>
+                    <span class="log-stat-value" id="lastError">None</span>
+                </div>
+                <div class="log-stat" style="margin-left: auto;">
+                    <div id="connectionStatus" class="connection-indicator disconnected">
+                        <span class="connection-dot"></span>
+                        <span>Disconnected</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log Controls -->
+            <div class="log-controls">
+                <button class="log-filter-btn active" data-level="">ALL</button>
+                <button class="log-filter-btn" data-level="ERROR">ERROR</button>
+                <button class="log-filter-btn" data-level="WARNING">WARNING</button>
+                <button class="log-filter-btn" data-level="INFO">INFO</button>
+                <button class="log-filter-btn" data-level="DEBUG">DEBUG</button>
+                <input type="text" class="log-search" id="logSearch" placeholder="Search logs...">
+                <button class="log-filter-btn" id="clearLogs">Clear</button>
+                <button class="log-filter-btn" id="copyLogs">Copy</button>
+                <label class="log-filter-btn" style="display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="autoScroll" checked>
+                    Auto-scroll
+                </label>
+            </div>
+
+            <!-- Log Container -->
+            <div class="log-container auto-scroll" id="logContainer">
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 48px; height: 48px; opacity: 0.5;">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                    <span>Waiting for gateway logs...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Council Memory Tab Panel -->
+        <div id="tab-memory" class="tab-panel">
+            <!-- Memory Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Events</div>
+                    <div class="stat-value" id="memory-events">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Atomic Facts</div>
+                    <div class="stat-value" id="memory-facts">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Sessions</div>
+                    <div class="stat-value" id="memory-sessions">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Insights</div>
+                    <div class="stat-value" id="memory-insights">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Decisions</div>
+                    <div class="stat-value" id="memory-decisions">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Constraints</div>
+                    <div class="stat-value" id="memory-constraints">-</div>
+                </div>
+            </div>
+
+            <!-- Atomic Facts Section -->
+            <div class="section">
+                <h2 class="section-title">Atomic Facts</h2>
+                <div class="table-card">
+                    <table id="facts-table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Content</th>
+                                <th>Observations</th>
+                                <th>Confidence</th>
+                                <th>First Observed</th>
+                            </tr>
+                        </thead>
+                        <tbody id="facts-table-body">
+                            <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Insights Section -->
+            <div class="section">
+                <h2 class="section-title">Recent Insights</h2>
+                <div class="table-card">
+                    <table id="insights-table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Content</th>
+                                <th>Source</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody id="memory-table-body">
+                            <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recent Sessions Section -->
+            <div class="section">
+                <h2 class="section-title">Recent Sessions</h2>
+                <div class="table-card">
+                    <table id="sessions-table">
+                        <thead>
+                            <tr>
+                                <th>Session ID</th>
+                                <th>Start Time</th>
+                                <th>Messages</th>
+                                <th>Tools</th>
+                                <th>Errors</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessions-table-body">
+                            <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pricing Tab Panel -->
+        <div id="tab-pricing" class="tab-panel">
+            <div class="ruling-notice">
+                <strong>Council Ruling (2026-01-30):</strong> No single query may exceed $2.50 in API costs.
+                Budget must be reserved before parallel dispatch. Failure triggers automatic degradation to Tier 1.
+            </div>
+
+            <!-- Loading -->
+            <div id="pricing-loading" class="loading">Loading pricing data...</div>
+
+            <!-- Budget Status -->
+            <div class="section" id="budget-section" style="display: none;">
+                <h2 class="section-title">Monthly Budget Status</h2>
+                <div class="budget-info">
+                    <div class="budget-grid">
+                        <div class="budget-item">
+                            <div class="label">Current Monthly Spend</div>
+                            <div class="value" id="current-spend">-</div>
+                        </div>
+                        <div class="budget-item">
+                            <div class="label">Per-Query Cost Ceiling</div>
+                            <div class="value" id="cost-ceiling">$2.50</div>
+                        </div>
+                        <div class="budget-item">
+                            <div class="label">Tier 1 (Simple)</div>
+                            <div class="value">$0.001 - $0.005</div>
+                        </div>
+                        <div class="budget-item">
+                            <div class="label">Tier 3 (Full Council)</div>
+                            <div class="value">$0.10 - $0.30</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tier Estimates -->
+            <div class="section" id="tier-section" style="display: none;">
+                <h2 class="section-title">Tier Cost Estimates</h2>
+                <div class="tier-grid" id="tier-grid">
+                    <!-- Tier cards will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Model Pricing Table -->
+            <div class="section" id="pricing-section" style="display: none;">
+                <h2 class="section-title">Model Pricing Details</h2>
+                <table class="pricing-table">
+                    <thead>
+                        <tr>
+                            <th>Model Alias</th>
+                            <th>Input (per 1M tokens)</th>
+                            <th>Output (per 1M tokens)</th>
+                            <th>Provider</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pricing-table-body">
+                        <!-- Pricing rows will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Last Updated -->
+            <div style="text-align: center; color: var(--text-secondary); font-size: 13px; margin-top: 20px;">
+                Last updated: <span id="pricing-last-updated">-</span>
+            </div>
+        </div>
+
+        <!-- Config Tab Panel -->
+        <div id="tab-config" class="tab-panel">
+            <!-- Config Type Selector -->
+            <div class="section">
+                <div class="section-header">
+                    <h2 class="section-title">Configuration Management</h2>
+                    <div class="config-selector">
+                        <button class="config-type-btn active" data-type="litellm">LiteLLM</button>
+                        <button class="config-type-btn" data-type="council">Council</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Config Loading -->
+            <div id="config-loading" class="loading">Loading configuration...</div>
+
+            <!-- Config Error -->
+            <div id="config-error" class="error-message" style="display: none;"></div>
+
+            <!-- Config Content -->
+            <div id="config-content" style="display: none;">
+                <!-- Config Actions -->
+                <div class="section">
+                    <div class="config-actions">
+                        <button id="save-config-btn" class="btn-primary">Save Changes</button>
+                        <button id="validate-config-btn" class="btn-secondary">Validate</button>
+                        <button id="refresh-config-btn" class="btn-secondary">Refresh</button>
+                        <button id="show-schema-btn" class="btn-secondary">Show Schema</button>
+                        <button id="show-backups-btn" class="btn-secondary">Backups</button>
+                    </div>
+                </div>
+
+                <!-- Config Editor -->
+                <div class="section">
+                    <h3 class="section-title">Configuration <span id="current-config-type"></span></h3>
+                    <div class="config-editor-container">
+                        <textarea id="config-editor" class="config-editor" spellcheck="false"></textarea>
+                    </div>
+                    <div class="config-help">
+                        <p><strong>Note:</strong> API keys should use the format <code>os.environ/VARIABLE_NAME</code></p>
+                        <p id="config-status" class="config-status"></p>
+                    </div>
+                </div>
+
+                <!-- Validation Results -->
+                <div id="validation-results" class="validation-results" style="display: none;">
+                    <h3>Validation Results</h3>
+                    <div id="validation-content"></div>
+                </div>
+
+                <!-- Schema Display -->
+                <div id="schema-display" class="schema-display" style="display: none;">
+                    <h3>JSON Schema</h3>
+                    <pre id="schema-content" class="code-block"></pre>
+                </div>
+
+                <!-- Backups Display -->
+                <div id="backups-display" class="backups-display" style="display: none;">
+                    <h3>Available Backups</h3>
+                    <div id="backups-content"></div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Council Observability Dashboard &bull; Auto-refresh every 30 seconds</p>
+            <p id="last-update">Last update: -</p>
+        </footer>
+    </div>
+
+    <div id="refresh-indicator" class="refresh-indicator">Refreshing...</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script>
+        // ============================================================================
+        // CONFIGURATION
+        // ============================================================================
+        const CONFIG = {
+            apiUrl: localStorage.getItem('dashboard-backend-url') || 'http://localhost:8081',
+            pollInterval: 30000,
+            token: localStorage.getItem('dashboard-token') || '064dbe76-7476-4e1b-a31d-57f7b0e8d618',
+            defaultRange: '24h',
+            authToken: localStorage.getItem('dashboardAuthToken') || ''
+        };
+
+        // Save token for future requests
+        if (CONFIG.token) {
+            localStorage.setItem('dashboard-token', CONFIG.token);
+        }
+
+        console.log('[CONFIG] Dashboard URL:', CONFIG.apiUrl);
+
+        // Auto-detect backend URL on page load
+        async function detectBackendUrl() {
+            const savedUrl = localStorage.getItem('dashboard-backend-url');
+            if (savedUrl && savedUrl !== 'http://localhost:8081') {
+                // Verify saved URL is still valid
+                try {
+                    const response = await fetch(`${savedUrl}/health`, {
+                        signal: AbortSignal.timeout(1000)
+                    });
+                    if (response.ok) {
+                        CONFIG.apiUrl = savedUrl;
+                        return true;
+                    }
+                } catch (e) {
+                    // Saved URL not valid, clear it
+                    localStorage.removeItem('dashboard-backend-url');
+                }
+            }
+
+            // Try common ports
+            const ports = [8080, 8081, 8082, 8083, 8084];
+            for (const port of ports) {
+                try {
+                    const response = await fetch(`http://localhost:${port}/health`, {
+                        signal: AbortSignal.timeout(1000)
+                    });
+                    if (response.ok) {
+                        const url = `http://localhost:${port}`;
+                        CONFIG.apiUrl = url;
+                        localStorage.setItem('dashboard-backend-url', url);
+                        console.log('[DETECT] Found backend at:', url);
+                        return true;
+                    }
+                } catch (e) {
+                    // Port not available, try next
+                }
+            }
+
+            // No backend found
+            console.warn('[DETECT] No backend found on ports 8080-8084');
+            return false;
+        }
+
+        // ============================================================================
+        // STATE
+        // ============================================================================
+        let charts = {};
+        let isTabActive = true;
+        let isLeader = true;
+        let lastTimestamp = 0;
+        let pollTimer = null;
+        let channel = null;
+
+        // Gateway logs state
+        let eventSource = null;
+        let currentFilter = '';
+        let maxLogLines = 1000;
+        let logEntries = [];
+
+        // ============================================================================
+        // CONNECTION STATUS
+        // ============================================================================
+        async function checkBackendConnection() {
+            const statusBadge = document.getElementById('connection-status');
+            const statusText = document.getElementById('connection-text');
+            const maxRetries = 3;
+            let retryCount = 0;
+
+            async function tryConnect() {
+                try {
+                    const response = await fetch(`${CONFIG.apiUrl}/health`, {
+                        signal: AbortSignal.timeout(5000)
+                    });
+                    if (response.ok) {
+                        statusBadge.className = 'status-badge healthy';
+                        statusText.textContent = 'Connected';
+                        return true;
+                    }
+                } catch (error) {
+                    retryCount++;
+                    if (retryCount < maxRetries) {
+                        statusBadge.className = 'status-badge unhealthy';
+                        statusText.textContent = `Reconnecting (${retryCount}/${maxRetries})...`;
+                        await new Promise(r => setTimeout(r, 2000));
+                        return tryConnect();
+                    }
+                }
+                statusBadge.className = 'status-badge unhealthy';
+                statusText.textContent = 'Disconnected - Start: python dashboard/backend/server.py';
+                return false;
+            }
+
+            // First detect the backend URL, then check connection
+            const detected = await detectBackendUrl();
+            if (detected) {
+                return tryConnect();
+            } else {
+                statusBadge.className = 'status-badge unhealthy';
+                statusText.textContent = 'Backend not found - Start: python dashboard/backend/server.py';
+                return false;
+            }
+        }
+
+        // ============================================================================
+        // TAB NAVIGATION
+        // ============================================================================
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check connection first
+            await checkBackendConnection();
+
+            // Tab switching
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabPanels = document.querySelectorAll('.tab-panel');
+
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tabId = btn.dataset.tab;
+
+                    // Update button states
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    // Update panel visibility
+                    tabPanels.forEach(panel => panel.classList.remove('active'));
+                    document.getElementById(`tab-${tabId}`).classList.add('active');
+
+                    // Initialize tab-specific content
+                    if (tabId === 'logs' && !eventSource) {
+                        initGatewayLogs();
+                    } else if (tabId === 'memory') {
+                        fetchCouncilMemory();
+                    } else if (tabId === 'pricing') {
+                        fetchPricing();
+                    } else if (tabId === 'config') {
+                        initConfigTab();
+                    }
+                });
+            });
+
+            // Time range dropdown
+            document.getElementById('time-range').addEventListener('change', () => {
+                updateDashboard(true);
+            });
+
+            // Refresh button
+            document.getElementById('refresh-btn').addEventListener('click', () => {
+                updateDashboard(true);
+            });
+
+            // Export button
+            document.getElementById('export-btn').addEventListener('click', async () => {
+                const range = document.getElementById('time-range').value;
+                const params = new URLSearchParams({
+                    token: CONFIG.token,
+                    format: 'csv',
+                    range: range
+                });
+
+                try {
+                    const response = await fetch(`${CONFIG.apiUrl}/api/export?${params}`);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `dashboard-export-${range}-${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                } catch (error) {
+                    alert('Export failed: ' + error.message);
+                }
+            });
+
+            // Initialize dashboard tab
+            initCharts();
+            setupTabCoordination();
+            updateDashboard(true);
+            startPolling();
+        });
+
+        // ============================================================================
+        // DASHBOARD TAB FUNCTIONS
+        // ============================================================================
+        function setupTabCoordination() {
+            if ('BroadcastChannel' in window) {
+                channel = new BroadcastChannel('council-dashboard');
+
+                channel.onmessage = (e) => {
+                    if (e.data.type === 'leader-ping') {
+                        isLeader = false;
+                    } else if (e.data.type === 'data-update') {
+                        updateDashboardData(e.data.payload);
+                    }
+                };
+
+                setTimeout(() => {
+                    channel.postMessage({ type: 'leader-ping' });
+                }, Math.random() * 1000);
+            }
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            isTabActive = !document.hidden;
+        });
+
+        async function fetchMetrics(range = CONFIG.defaultRange) {
+            const params = new URLSearchParams({
+                token: CONFIG.token,
+                range: range
+            });
+
+            const response = await fetch(`${CONFIG.apiUrl}/api/metrics?${params}`);
+
+            if (response.status === 401) {
+                localStorage.removeItem('dashboard-token');
+                const newToken = prompt('Auth token expired. Enter new token:');
+                if (newToken) {
+                    CONFIG.token = newToken;
+                    localStorage.setItem('dashboard-token', newToken);
+                    return fetchMetrics(range);
+                }
+                throw new Error('Authentication required');
+            }
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            if (data.length === 1 && data[0].error) {
+                throw new Error(`Database error: ${data[0].error}`);
+            }
+
+            return data;
+        }
+
+        async function fetchHealth() {
+            const params = new URLSearchParams({ token: CONFIG.token });
+            const response = await fetch(`${CONFIG.apiUrl}/api/health?${params}`);
+
+            if (response.status === 401) {
+                throw new Error('Authentication required');
+            }
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            return await response.json();
+        }
+
+        function processMetrics(data) {
+            if (!Array.isArray(data)) return null;
+
+            const byModel = {};
+            let totalCalls = 0;
+            let totalTokens = 0;
+            let totalCost = 0;
+            let successCount = 0;
+
+            data.forEach(item => {
+                const model = item.model || 'unknown';
+                if (!byModel[model]) {
+                    byModel[model] = {
+                        calls: 0,
+                        tokens: 0,
+                        cost: 0,
+                        success: 0,
+                        latency: [],
+                        task_types: {}
+                    };
+                }
+
+                byModel[model].calls++;
+                byModel[model].tokens += (item.total_tokens || 0);
+                byModel[model].cost += (item.cost_usd || 0);
+                if (item.status === 'success') byModel[model].success++;
+                if (item.duration_seconds) {
+                    byModel[model].latency.push(item.duration_seconds * 1000);
+                }
+
+                totalCalls++;
+                totalTokens += (item.total_tokens || 0);
+                totalCost += (item.cost_usd || 0);
+                if (item.status === 'success') successCount++;
+            });
+
+            return {
+                byModel,
+                summary: {
+                    calls: totalCalls,
+                    tokens: totalTokens,
+                    cost: totalCost,
+                    successRate: totalCalls > 0 ? (successCount / totalCalls * 100) : 0
+                }
+            };
+        }
+
+        function getModelTier(model) {
+            const tier1 = ['gemini-flash', 'gemini-architect'];
+            const tier2 = ['deepseek-v3', 'deepseek-chat', 'deepseek-security'];
+            const tier3 = ['kimi-k2-5', 'kimi-researcher', 'kimi-synthesis', 'kimi-deep'];
+            const tier4 = ['opus-synthesis', 'opus-judge', 'claude-sonnet'];
+
+            const lower = model.toLowerCase();
+            if (tier1.some(t => lower.includes(t))) return 1;
+            if (tier2.some(t => lower.includes(t))) return 2;
+            if (tier3.some(t => lower.includes(t))) return 3;
+            if (tier4.some(t => lower.includes(t))) return 4;
+            return 0;
+        }
+
+        function updateStats(summary) {
+            document.getElementById('stat-calls').textContent = formatNumber(summary.calls);
+            document.getElementById('stat-tokens').textContent = formatNumber(summary.tokens);
+            document.getElementById('stat-cost').textContent = '$' + summary.cost.toFixed(2);
+            document.getElementById('stat-success').textContent = summary.successRate.toFixed(1) + '%';
+        }
+
+        function updateModelTable(byModel) {
+            const tbody = document.getElementById('model-table-body');
+            const rows = Object.entries(byModel)
+                .map(([model, stats]) => ({
+                    model,
+                    ...stats,
+                    avgLatency: stats.latency.length > 0
+                        ? stats.latency.reduce((a, b) => a + b, 0) / stats.latency.length
+                        : 0,
+                    successRate: (stats.success / stats.calls * 100)
+                }))
+                .sort((a, b) => b.calls - a.calls);
+
+            tbody.innerHTML = rows.map(row => {
+                const tier = getModelTier(row.model);
+                return `
+                    <tr>
+                        <td><span class="model-badge model-tier-${tier}">${row.model}</span></td>
+                        <td>${formatNumber(row.calls)}</td>
+                        <td>${formatNumber(row.tokens)}</td>
+                        <td>$${row.cost.toFixed(4)}</td>
+                        <td>${row.avgLatency.toFixed(0)}ms</td>
+                        <td>${row.successRate.toFixed(1)}%</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateGatewayStatus(health) {
+            const badge = document.getElementById('gateway-status');
+            const gateway = health.gateway;
+
+            if (!gateway) {
+                badge.className = 'status-badge unhealthy';
+                badge.innerHTML = '<span class="status-dot"></span><span>Unknown</span>';
+                return;
+            }
+
+            const isHealthy = gateway.gateway_status === 'up';
+            badge.className = isHealthy ? 'status-badge healthy' : 'status-badge unhealthy';
+            badge.innerHTML = `<span class="status-dot"></span><span>${gateway.gateway_status}</span>`;
+        }
+
+        function initCharts() {
+            const chartDefaults = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#8b949e' }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#8b949e' },
+                        grid: { color: '#21262d' }
+                    },
+                    y: {
+                        ticks: { color: '#8b949e' },
+                        grid: { color: '#21262d' }
+                    }
+                }
+            };
+
+            charts.tokens = new Chart(document.getElementById('tokens-chart'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Tokens',
+                        data: [],
+                        borderColor: '#58a6ff',
+                        backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    ...chartDefaults,
+                    plugins: {
+                        ...chartDefaults.plugins,
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            charts.model = new Chart(document.getElementById('model-chart'), {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            '#58a6ff', '#a371f7', '#3fb950', '#d29922',
+                            '#f85149', '#ff7b72', '#7ee787', '#fff'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { color: '#8b949e' }
+                        }
+                    }
+                }
+            });
+
+            charts.cost = new Chart(document.getElementById('cost-chart'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Cost (USD)',
+                        data: [],
+                        backgroundColor: 'rgba(163, 113, 247, 0.6)'
+                    }]
+                },
+                options: {
+                    ...chartDefaults,
+                    indexAxis: 'y',
+                    plugins: {
+                        ...chartDefaults.plugins,
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            charts.latency = new Chart(document.getElementById('latency-chart'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Response Time (ms)',
+                        data: [],
+                        borderColor: '#3fb950',
+                        backgroundColor: 'rgba(63, 185, 80, 0.1)',
+                        fill: true
+                    }]
+                },
+                options: {
+                    ...chartDefaults,
+                    plugins: {
+                        ...chartDefaults.plugins,
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function updateCharts(data, processed) {
+            const timestamps = data.map(d => new Date(d.timestamp)).reverse();
+            const tokens = data.map(d => d.total_tokens || 0).reverse();
+            const latencies = data.map(d => (d.duration_seconds || 0) * 1000).reverse();
+
+            charts.tokens.data.labels = timestamps;
+            charts.tokens.data.datasets[0].data = tokens;
+            charts.tokens.update('none');
+
+            const models = Object.keys(processed.byModel);
+            const modelCalls = models.map(m => processed.byModel[m].calls);
+            charts.model.data.labels = models;
+            charts.model.data.datasets[0].data = modelCalls;
+            charts.model.update('none');
+
+            charts.cost.data.labels = models;
+            charts.cost.data.datasets[0].data = models.map(m => processed.byModel[m].cost);
+            charts.cost.update('none');
+
+            charts.latency.data.labels = timestamps;
+            charts.latency.data.datasets[0].data = latencies;
+            charts.latency.update('none');
+        }
+
+        function updateDashboardData(data) {
+            const processed = processMetrics(data.metrics);
+            if (processed) {
+                updateStats(processed.summary);
+                updateModelTable(processed.byModel);
+                updateCharts(data.metrics, processed);
+            }
+            updateGatewayStatus(data.health);
+            updateLastUpdate();
+        }
+
+        async function updateDashboard(force = false) {
+            if (!isTabActive && !force) return;
+
+            const range = document.getElementById('time-range').value;
+
+            try {
+                showRefreshIndicator();
+
+                const [metrics, health] = await Promise.all([
+                    fetchMetrics(range),
+                    fetchHealth()
+                ]);
+
+                const processed = processMetrics(metrics);
+
+                if (processed) {
+                    updateStats(processed.summary);
+                    updateModelTable(processed.byModel);
+                    updateCharts(metrics, processed);
+                }
+
+                updateGatewayStatus(health);
+                updateLastUpdate();
+
+                if (channel && isLeader) {
+                    channel.postMessage({
+                        type: 'data-update',
+                        payload: { metrics, health }
+                    });
+                }
+            } catch (error) {
+                console.error('Update error:', error);
+                showError(error.message);
+            }
+        }
+
+        function startPolling() {
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = setInterval(() => updateDashboard(), CONFIG.pollInterval);
+        }
+
+        // ============================================================================
+        // GATEWAY LOGS TAB FUNCTIONS
+        // ============================================================================
+        function initGatewayLogs() {
+            setupLogEventListeners();
+            fetchLogStats();
+            fetchInitialLogs();
+            startLogStreaming();
+        }
+
+        function setupLogEventListeners() {
+            document.querySelectorAll('.log-filter-btn[data-level]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.log-filter-btn[data-level]').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentFilter = btn.dataset.level;
+                    renderLogs();
+                });
+            });
+
+            document.getElementById('clearLogs').addEventListener('click', () => {
+                logEntries = [];
+                renderLogs();
+            });
+
+            document.getElementById('copyLogs').addEventListener('click', () => {
+                const text = logEntries.map(e => formatLogEntry(e)).join('\n');
+                navigator.clipboard.writeText(text).then(() => {
+                    const btn = document.getElementById('copyLogs');
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Copied!';
+                    setTimeout(() => btn.textContent = originalText, 1500);
+                });
+            });
+
+            document.getElementById('logSearch').addEventListener('input', renderLogs);
+
+            const logContainer = document.getElementById('logContainer');
+            logContainer.addEventListener('mouseenter', () => {
+                logContainer.classList.remove('auto-scroll');
+            });
+
+            logContainer.addEventListener('mouseleave', () => {
+                if (document.getElementById('autoScroll').checked) {
+                    logContainer.classList.add('auto-scroll');
+                }
+            });
+
+            document.getElementById('autoScroll').addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    logContainer.classList.add('auto-scroll');
+                }
+            });
+        }
+
+        async function fetchLogStats() {
+            try {
+                const response = await fetch(`${CONFIG.apiUrl}/api/gateway-logs/stats?token=${CONFIG.token}`);
+                if (response.ok) {
+                    const stats = await response.json();
+                    document.getElementById('errorCount').textContent = stats.level_counts?.ERROR || 0;
+                    document.getElementById('warningCount').textContent = stats.level_counts?.WARNING || 0;
+                    document.getElementById('infoCount').textContent = stats.level_counts?.INFO || 0;
+                    document.getElementById('lastError').textContent = stats.last_error || 'None';
+                }
+            } catch (error) {
+                console.error('Failed to fetch stats:', error);
+            }
+        }
+
+        async function fetchInitialLogs() {
+            try {
+                const response = await fetch(`${CONFIG.apiUrl}/api/gateway-logs?lines=100&token=${CONFIG.token}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    logEntries = data.logs || [];
+                    renderLogs();
+                }
+            } catch (error) {
+                console.error('Failed to fetch logs:', error);
+            }
+        }
+
+        function startLogStreaming() {
+            const url = `${CONFIG.apiUrl}/api/gateway-logs?stream=true&token=${CONFIG.token}`;
+            eventSource = new EventSource(url);
+
+            eventSource.onopen = () => {
+                const connectionStatus = document.getElementById('connectionStatus');
+                connectionStatus.className = 'connection-indicator connected';
+                connectionStatus.querySelector('span:last-child').textContent = 'Live';
+            };
+
+            eventSource.onerror = () => {
+                const connectionStatus = document.getElementById('connectionStatus');
+                connectionStatus.className = 'connection-indicator disconnected';
+                connectionStatus.querySelector('span:last-child').textContent = 'Disconnected';
+                setTimeout(startLogStreaming, 3000);
+            };
+
+            eventSource.addEventListener('log', (event) => {
+                try {
+                    const logEntry = JSON.parse(event.data);
+                    addLogEntry(logEntry);
+                } catch (error) {
+                    console.error('Failed to parse log entry:', error);
+                }
+            });
+        }
+
+        function addLogEntry(entry) {
+            logEntries.push(entry);
+
+            if (logEntries.length > maxLogLines) {
+                logEntries = logEntries.slice(-maxLogLines);
+            }
+
+            renderLogs();
+            fetchLogStats();
+        }
+
+        function renderLogs() {
+            const searchTerm = document.getElementById('logSearch').value.toLowerCase();
+            const logContainer = document.getElementById('logContainer');
+
+            let filteredLogs = logEntries;
+            if (currentFilter) {
+                filteredLogs = filteredLogs.filter(log => log._level === currentFilter);
+            }
+            if (searchTerm) {
+                filteredLogs = filteredLogs.filter(log => {
+                    const message = log.message || JSON.stringify(log);
+                    return message.toLowerCase().includes(searchTerm);
+                });
+            }
+
+            if (filteredLogs.length === 0) {
+                logContainer.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 48px; height: 48px; opacity: 0.5;">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                        <span>${logEntries.length === 0 ? 'Waiting for gateway logs...' : 'No logs match the current filter.'}</span>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = filteredLogs.map(entry => {
+                const timestamp = formatLogTimestamp(entry.timestamp || entry.time);
+                const level = entry._level || 'INFO';
+
+                let message = entry.message || entry.error || JSON.stringify(entry);
+
+                return `
+                    <div class="log-entry ${level}">
+                        <span class="log-timestamp">${timestamp}</span>
+                        <span class="log-level ${level}">${level}</span>
+                        <span class="log-message">${escapeHtml(message)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            logContainer.innerHTML = html;
+
+            if (document.getElementById('autoScroll').checked && filteredLogs.length > 0) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        }
+
+        function formatLogTimestamp(ts) {
+            if (!ts) return new Date().toLocaleTimeString();
+            try {
+                const date = new Date(ts);
+                return date.toLocaleTimeString();
+            } catch {
+                return ts;
+            }
+        }
+
+        function formatLogEntry(entry) {
+            const timestamp = formatLogTimestamp(entry.timestamp || entry.time);
+            const level = entry._level || 'INFO';
+            const message = entry.message || entry.error || JSON.stringify(entry);
+            return `[${timestamp}] [${level}] ${message}`;
+        }
+
+        // ============================================================================
+        // PRICING TAB FUNCTIONS
+        // ============================================================================
+        async function fetchPricing() {
+            try {
+                const params = new URLSearchParams({ token: CONFIG.token });
+                const response = await fetch(`${CONFIG.apiUrl}/api/pricing?${params}`);
+
+                if (response.status === 401) {
+                    // Re-fetch metrics to trigger token prompt
+                    await fetchMetrics();
+                    return fetchPricing();
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                displayPricing(data);
+            } catch (error) {
+                showPricingError(`Failed to load pricing data: ${error.message}`);
+            }
+        }
+
+        async function getAuthToken() {
+            const response = await fetch(`${CONFIG.apiUrl}/api/auth-token`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            return data.token;
+        }
+
+        // ============================================================================
+        // COUNCIL MEMORY FUNCTIONS
+        // ============================================================================
+        async function fetchCouncilMemory() {
+            try {
+                const params = new URLSearchParams({
+                    token: CONFIG.token,
+                    limit: 20,
+                    sections: 'stats,atomic_facts,insights,sessions,decisions,constraints'
+                });
+                const response = await fetch(`${CONFIG.apiUrl}/api/council-memory?${params}`);
+
+                if (response.status === 401) {
+                    await fetchMetrics();
+                    return fetchCouncilMemory();
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                displayCouncilMemory(data);
+            } catch (error) {
+                showCouncilMemoryError(`Failed to load Council Memory: ${error.message}`);
+            }
+        }
+
+        function displayCouncilMemory(data) {
+            // Update stats cards
+            if (data.stats) {
+                updateStat('memory-events', data.stats.events_count || 0);
+                updateStat('memory-facts', data.stats.atomic_facts_count || 0);
+                updateStat('memory-sessions', data.stats.sessions_count || 0);
+                updateStat('memory-insights', data.stats.insights_count || 0);
+                updateStat('memory-decisions', data.stats.decisions_count || 0);
+                updateStat('memory-constraints', data.stats.constraints_count || 0);
+            }
+
+            // Display insights
+            const insightsBody = document.getElementById('memory-table-body');
+            if (data.insights && data.insights.length > 0) {
+                insightsBody.innerHTML = data.insights.map(insight => {
+                    // Parse metadata to get source_tool
+                    let sourceTool = 'unknown';
+                    if (insight.metadata) {
+                        try {
+                            const metadata = typeof insight.metadata === 'string'
+                                ? JSON.parse(insight.metadata)
+                                : insight.metadata;
+                            sourceTool = metadata.source_tool || metadata.source || 'unknown';
+                        } catch (e) {
+                            sourceTool = 'unknown';
+                        }
+                    }
+
+                    return `
+                    <tr>
+                        <td><span class="model-badge">${escapeHtml(insight.category || 'general')}</span></td>
+                        <td>${escapeHtml(insight.content || '')}</td>
+                        <td><span class="tool-badge">${escapeHtml(sourceTool)}</span></td>
+                        <td>${formatDate(insight.created_at)}</td>
+                    </tr>
+                    `;
+                }).join('');
+            } else {
+                insightsBody.innerHTML = '<tr><td colspan="4" class="empty-state">No insights found</td></tr>';
+            }
+
+            // Display atomic facts
+            const factsBody = document.getElementById('facts-table-body');
+            if (data.atomic_facts && data.atomic_facts.length > 0) {
+                factsBody.innerHTML = data.atomic_facts.map(fact => `
+                    <tr>
+                        <td><span class="model-badge">${escapeHtml(fact.category || 'general')}</span></td>
+                        <td>${escapeHtml(String(fact.content || '').substring(0, 150))}${fact.content && fact.content.length > 150 ? '...' : ''}</td>
+                        <td>${fact.observation_count || 0}</td>
+                        <td>${fact.confidence ? Math.round(fact.confidence * 100) + '%' : 'N/A'}</td>
+                        <td>${formatDate(fact.first_observed || fact.created_at)}</td>
+                    </tr>
+                `).join('');
+            } else {
+                factsBody.innerHTML = '<tr><td colspan="5" class="empty-state">No atomic facts found</td></tr>';
+            }
+
+            // Display sessions
+            const sessionsBody = document.getElementById('sessions-table-body');
+            if (data.sessions && data.sessions.length > 0) {
+                sessionsBody.innerHTML = data.sessions.map(session => `
+                    <tr>
+                        <td><code class="session-id">${escapeHtml(session.session_id || '').substring(0, 8)}...</code></td>
+                        <td>${formatDate(session.start_time)}</td>
+                        <td>${session.message_count || 0}</td>
+                        <td>${session.tool_call_count || 0}</td>
+                        <td>${session.error_count || 0}</td>
+                        <td>${session.duration_seconds ? Math.round(session.duration_seconds) + 's' : 'N/A'}</td>
+                    </tr>
+                `).join('');
+            } else {
+                sessionsBody.innerHTML = '<tr><td colspan="6" class="empty-state">No sessions found</td></tr>';
+            }
+        }
+
+        function updateStat(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = formatNumber(value);
+        }
+
+        function showCouncilMemoryError(message) {
+            const insightsBody = document.getElementById('memory-table-body');
+            insightsBody.innerHTML = `<tr><td colspan="4" class="error-state">${escapeHtml(message)}</td></tr>`;
+
+            const sessionsBody = document.getElementById('sessions-table-body');
+            sessionsBody.innerHTML = `<tr><td colspan="6" class="error-state">${escapeHtml(message)}</td></tr>`;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleString();
+            } catch {
+                return dateStr;
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function displayPricing(data) {
+            document.getElementById('pricing-loading').style.display = 'none';
+
+            if (data.error) {
+                showPricingError(data.error);
+                return;
+            }
+
+            // Update budget status
+            document.getElementById('budget-section').style.display = 'block';
+            const currentSpend = data.current_monthly_spend || 0;
+            const spendElement = document.getElementById('current-spend');
+            spendElement.textContent = `$${currentSpend.toFixed(2)}`;
+            if (currentSpend > 40) {
+                spendElement.classList.add('danger');
+            } else if (currentSpend > 20) {
+                spendElement.classList.add('warning');
+            }
+
+            // Update tier estimates
+            document.getElementById('tier-section').style.display = 'block';
+            const tierGrid = document.getElementById('tier-grid');
+            for (const [tierName, tierData] of Object.entries(data.tier_estimates)) {
+                const [minCost, maxCost] = tierData.estimated_cost_range;
+                const card = document.createElement('div');
+                card.className = 'tier-card';
+                card.innerHTML = `
+                    <h3>${tierName}</h3>
+                    <div class="tier-name">${tierData.name}</div>
+                    <div class="cost-range">
+                        <span class="currency">$</span>${minCost.toFixed(3)} - ${maxCost.toFixed(3)}
+                    </div>
+                    <div class="models">
+                        <strong>Models:</strong><br>
+                        ${tierData.models.map(m => `<code>${m}</code>`).join(' ')}
+                    </div>
+                `;
+                tierGrid.appendChild(card);
+            }
+
+            // Update pricing table
+            document.getElementById('pricing-section').style.display = 'block';
+            const tableBody = document.getElementById('pricing-table-body');
+            for (const [alias, pricing] of Object.entries(data.model_pricing)) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><code>${alias}</code></td>
+                    <td class="price-value">$${pricing.input_price_per_1m.toFixed(2)}</td>
+                    <td class="price-value">$${pricing.output_price_per_1m.toFixed(2)}</td>
+                    <td><span class="provider-badge ${pricing.provider}">${pricing.provider}</span></td>
+                `;
+                tableBody.appendChild(row);
+            }
+
+            document.getElementById('pricing-last-updated').textContent = new Date(data.timestamp).toLocaleString();
+        }
+
+        function showPricingError(message) {
+            const container = document.getElementById('error-container');
+            container.innerHTML = `<div class="error">${message}</div>`;
+            document.getElementById('pricing-loading').style.display = 'none';
+        }
+
+        // ============================================================================
+        // COMMON FUNCTIONS
+        // ============================================================================
+        function updateLastUpdate() {
+            document.getElementById('last-update').textContent =
+                'Last update: ' + new Date().toLocaleTimeString();
+        }
+
+        function showRefreshIndicator() {
+            const indicator = document.getElementById('refresh-indicator');
+            indicator.classList.add('visible');
+            setTimeout(() => indicator.classList.remove('visible'), 1000);
+        }
+
+        function showError(message, details = null) {
+            const container = document.getElementById('error-container');
+            let html = `<div class="error"><strong>Error:</strong> ${escapeHtml(message)}`;
+
+            if (details) {
+                html += `<br><small><strong>Details:</strong> ${escapeHtml(JSON.stringify(details))}</small>`;
+            }
+
+            if (message.includes('auth') || message.includes('401')) {
+                html += `<br><small><strong>Tip:</strong> Check your auth token. Run: <code>cat dashboard/data/.auth-token</code></small>`;
+            } else if (message.includes('fetch') || message.includes('Failed to fetch')) {
+                html += `<br><small><strong>Tip:</strong> Ensure the server is running: <code>cd dashboard/backend && python server.py</code></small>`;
+            }
+
+            html += `</div>`;
+            container.innerHTML = html;
+            setTimeout(() => container.innerHTML = '', 10000);
+            console.error('[Dashboard Error]', message, details);
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toLocaleString();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+
+        // ============================================================================
+        // CONFIG MANAGEMENT FUNCTIONS
+        // ============================================================================
+        let currentConfigType = 'litellm';
+        let configData = null;
+        let configSchema = null;
+
+        function initConfigTab() {
+            // Config type selector buttons
+            document.querySelectorAll('.config-type-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.config-type-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentConfigType = btn.dataset.type;
+                    loadConfig();
+                });
+            });
+
+            // Config action buttons
+            document.getElementById('save-config-btn').addEventListener('click', saveConfig);
+            document.getElementById('validate-config-btn').addEventListener('click', validateConfig);
+            document.getElementById('refresh-config-btn').addEventListener('click', loadConfig);
+            document.getElementById('show-schema-btn').addEventListener('click', toggleSchema);
+            document.getElementById('show-backups-btn').addEventListener('click', toggleBackups);
+
+            // Load initial config
+            loadConfig();
+        }
+
+        async function loadConfig() {
+            try {
+                showConfigLoading(true);
+                hideConfigError();
+                hideValidationResults();
+
+                const response = await fetch(`${CONFIG.apiUrl}/api/config?token=${CONFIG.token}&types=${currentConfigType}&include_secrets=false`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                if (data.configs && data.configs[currentConfigType]) {
+                    configData = data.configs[currentConfigType];
+                    displayConfig(configData);
+                    showConfigContent(true);
+                } else {
+                    throw new Error('No configuration data received');
+                }
+            } catch (error) {
+                showConfigError(`Failed to load configuration: ${error.message}`);
+            } finally {
+                showConfigLoading(false);
+            }
+        }
+
+        function displayConfig(config) {
+            const editor = document.getElementById('config-editor');
+            document.getElementById('current-config-type').textContent = currentConfigType === 'litellm' ? 'LiteLLM' : 'Council';
+
+            // Convert to YAML-like format for better readability
+            const yaml = jsonToYaml(config);
+            editor.value = yaml;
+        }
+
+        function jsonToYaml(obj, indent = 0) {
+            const spaces = '  '.repeat(indent);
+            let result = '';
+
+            if (Array.isArray(obj)) {
+                for (const item of obj) {
+                    if (typeof item === 'object' && item !== null) {
+                        result += `${spaces}-\n${jsonToYaml(item, indent + 1)}`;
+                    } else {
+                        result += `${spaces}- ${formatYamlValue(item)}\n`;
+                    }
+                }
+            } else if (typeof obj === 'object' && obj !== null) {
+                for (const [key, value] of Object.entries(obj)) {
+                    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                        result += `${spaces}${key}:\n${jsonToYaml(value, indent + 1)}`;
+                    } else if (Array.isArray(value)) {
+                        result += `${spaces}${key}:\n${jsonToYaml(value, indent + 1)}`;
+                    } else {
+                        result += `${spaces}${key}: ${formatYamlValue(value)}\n`;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        function formatYamlValue(value) {
+            if (typeof value === 'string') {
+                if (value.includes('\n') || value.includes(':') || value.includes('#')) {
+                    return `"${value.replace(/"/g, '\\"')}"`;
+                }
+                return value;
+            }
+            if (typeof value === 'boolean') {
+                return value ? 'true' : 'false';
+            }
+            if (value === null) {
+                return 'null';
+            }
+            return String(value);
+        }
+
+        function parseConfig(str) {
+            try {
+                return JSON.parse(str);
+            } catch (e) {
+                // Try to parse as YAML-like format
+                return parseSimpleYaml(str);
+            }
+        }
+
+        function parseSimpleYaml(str) {
+            const result = {};
+            const lines = str.split('\n');
+            let currentObj = result;
+            const stack = [{ obj: result, indent: -1 }];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (!line.trim() || line.trim().startsWith('#')) continue;
+
+                const indent = line.search(/\S|$/);
+                const trimmed = line.trim();
+
+                // Pop stack to correct level
+                while (stack.length > 1 && stack[stack.length - 1].indent >= indent) {
+                    stack.pop();
+                }
+                currentObj = stack[stack.length - 1].obj;
+
+                if (trimmed.includes(':')) {
+                    const colonPos = trimmed.indexOf(':');
+                    const key = trimmed.substring(0, colonPos).trim();
+                    let value = trimmed.substring(colonPos + 1).trim();
+
+                    if (value === '') {
+                        // Create nested object
+                        currentObj[key] = {};
+                        stack.push({ obj: currentObj[key], indent: indent });
+                    } else if (value === 'true' || value === 'false') {
+                        currentObj[key] = value === 'true';
+                    } else if (value === 'null' || value === '~') {
+                        currentObj[key] = null;
+                    } else if (value.startsWith('"') || value.startsWith("'")) {
+                        currentObj[key] = value.slice(1, -1);
+                    } else if (!isNaN(value)) {
+                        currentObj[key] = Number(value);
+                    } else if (value.startsWith('[')) {
+                        // Simple array
+                        try {
+                            currentObj[key] = JSON.parse(value);
+                        } catch {
+                            currentObj[key] = value;
+                        }
+                    } else {
+                        currentObj[key] = value;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        function parseYaml(str) {
+            return parseConfig(str);
+        }
+
+        async function saveConfig() {
+            try {
+                const editor = document.getElementById('config-editor');
+                const content = editor.value;
+                const config = parseConfig(content);
+
+                if (!config) {
+                    showConfigStatus('Invalid YAML format', 'error');
+                    return;
+                }
+
+                showConfigStatus('Saving...', 'success');
+
+                const response = await fetch(`${CONFIG.apiUrl}/api/config?token=${CONFIG.token}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: currentConfigType,
+                        config: config
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || `HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                showConfigStatus('Configuration saved successfully!', 'success');
+
+                if (result.validation && !result.validation.valid) {
+                    displayValidationResults(result.validation);
+                }
+
+                // Reload after a short delay
+                setTimeout(() => loadConfig(), 1000);
+            } catch (error) {
+                showConfigStatus(`Failed to save: ${error.message}`, 'error');
+            }
+        }
+
+        async function validateConfig() {
+            try {
+                const editor = document.getElementById('config-editor');
+                const content = editor.value;
+                const config = parseConfig(content);
+
+                if (!config) {
+                    showConfigStatus('Invalid YAML format', 'error');
+                    return;
+                }
+
+                const response = await fetch(`${CONFIG.apiUrl}/api/config/validate?token=${CONFIG.token}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: currentConfigType,
+                        config: config
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                displayValidationResults(result);
+            } catch (error) {
+                showConfigStatus(`Validation failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function toggleSchema() {
+            const display = document.getElementById('schema-display');
+            if (display.style.display !== 'none') {
+                display.style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${CONFIG.apiUrl}/api/config/schema?token=${CONFIG.token}&type=${currentConfigType}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.schema) {
+                    document.getElementById('schema-content').textContent = JSON.stringify(data.schema, null, 2);
+                    display.style.display = 'block';
+                } else {
+                    showConfigStatus('No schema available', 'error');
+                }
+            } catch (error) {
+                showConfigStatus(`Failed to load schema: ${error.message}`, 'error');
+            }
+        }
+
+        async function toggleBackups() {
+            const display = document.getElementById('backups-display');
+            if (display.style.display !== 'none') {
+                display.style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${CONFIG.apiUrl}/api/config/backups?token=${CONFIG.token}&type=${currentConfigType}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.backups) {
+                    displayBackups(data.backups);
+                    display.style.display = 'block';
+                } else {
+                    showConfigStatus('No backups available', 'error');
+                }
+            } catch (error) {
+                showConfigStatus(`Failed to load backups: ${error.message}`, 'error');
+            }
+        }
+
+        function displayBackups(backups) {
+            const content = document.getElementById('backups-content');
+            if (backups.length === 0) {
+                content.innerHTML = '<p>No backups available.</p>';
+                return;
+            }
+
+            content.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Filename</th>
+                            <th>Timestamp</th>
+                            <th>Size (bytes)</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${backups.map(backup => `
+                            <tr>
+                                <td>${escapeHtml(backup.filename)}</td>
+                                <td>${formatDate(backup.timestamp)}</td>
+                                <td>${backup.size}</td>
+                                <td><button class="btn-secondary" onclick="restoreBackup('${backup.filename}')">Restore</button></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        async function restoreBackup(filename) {
+            if (!confirm(`Restore backup: ${filename}?\n\nThis will overwrite the current configuration.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${CONFIG.apiUrl}/api/config/revert?token=${CONFIG.token}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: currentConfigType,
+                        backup: filename
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || `HTTP ${response.status}`);
+                }
+
+                showConfigStatus('Backup restored successfully!', 'success');
+                loadConfig();
+            } catch (error) {
+                showConfigStatus(`Failed to restore backup: ${error.message}`, 'error');
+            }
+        }
+
+        function displayValidationResults(result) {
+            const display = document.getElementById('validation-results');
+            const content = document.getElementById('validation-content');
+
+            let html = '';
+            if (result.valid) {
+                html = '<p class="valid">✓ Configuration is valid!</p>';
+                if (result.warnings && result.warnings.length > 0) {
+                    html += '<p class="warning">Warnings:</p><ul>';
+                    result.warnings.forEach(w => {
+                        html += `<li class="warning">${escapeHtml(w)}</li>`;
+                    });
+                    html += '</ul>';
+                }
+            } else {
+                html = '<p class="invalid">✗ Configuration validation failed:</p><ul>';
+                result.errors.forEach(e => {
+                    html += `<li class="invalid">${escapeHtml(e)}</li>`;
+                });
+                html += '</ul>';
+                if (result.warnings && result.warnings.length > 0) {
+                    html += '<p class="warning">Warnings:</p><ul>';
+                    result.warnings.forEach(w => {
+                        html += `<li class="warning">${escapeHtml(w)}</li>`;
+                    });
+                    html += '</ul>';
+                }
+            }
+
+            content.innerHTML = html;
+            display.style.display = 'block';
+        }
+
+        function hideValidationResults() {
+            document.getElementById('validation-results').style.display = 'none';
+        }
+
+        function showConfigLoading(show) {
+            document.getElementById('config-loading').style.display = show ? 'block' : 'none';
+            if (show) {
+                document.getElementById('config-content').style.display = 'none';
+            }
+        }
+
+        function showConfigContent(show) {
+            document.getElementById('config-content').style.display = show ? 'block' : 'none';
+        }
+
+        function showConfigError(message) {
+            const error = document.getElementById('config-error');
+            error.textContent = message;
+            error.style.display = 'block';
+            document.getElementById('config-content').style.display = 'none';
+        }
+
+        function hideConfigError() {
+            document.getElementById('config-error').style.display = 'none';
+        }
+
+        function showConfigStatus(message, type) {
+            const status = document.getElementById('config-status');
+            status.textContent = message;
+            status.className = 'config-status ' + type;
+        }
+
+        function formatYaml(obj) {
+            // Simple YAML formatter
+            const yaml = require('yaml');
+            return yaml.stringify(obj);
+        }
+
+        function parseYaml(str) {
+            // Simple YAML parser
+            const lines = str.split('\n');
+            const result = {};
+            let currentSection = result;
+            let indent = 0;
+
+            for (const line of lines) {
+                if (!line.trim() || line.trim().startsWith('#')) continue;
+
+                const currentIndent = line.search(/\S|$/);
+                const trimmed = line.trim();
+
+                if (trimmed.includes(':')) {
+                    const [key, ...valueParts] = trimmed.split(':');
+                    const value = valueParts.join(':').trim();
+
+                    if (value === '') {
+                        currentSection[key] = {};
+                    } else if (value === 'true') {
+                        currentSection[key] = true;
+                    } else if (value === 'false') {
+                        currentSection[key] = false;
+                    } else if (!isNaN(value)) {
+                        currentSection[key] = Number(value);
+                    } else {
+                        currentSection[key] = value.replace(/^["']|["']$/g, '');
+                    }
+                }
+            }
+
+            return result;
+        }
+    </script>
+</body>
+</html>

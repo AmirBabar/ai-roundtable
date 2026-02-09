@@ -1,0 +1,38 @@
+# AI Roundtable - Optional Python Dependencies
+#
+# The core skill requires ZERO dependencies - it works entirely with
+# Claude Code's native capabilities.
+#
+# These dependencies are OPTIONAL and only needed for enhanced features:
+# - LiteLLM gateway (multi-model routing)
+# - Dashboard (web UI)
+# - Memory subsystem (persistent context)
+#
+# Install only what you need:
+#   pip install -r requirements.txt
+#
+# Or install individual components:
+#   pip install litellm           # For multi-model gateway
+#   pip install flask              # For dashboard
+
+# LiteLLM Gateway (for multi-model routing)
+litellm>=1.0.0
+
+# Dashboard (web UI for monitoring)
+flask>=3.0.0
+werkzeug>=3.0.0
+
+# HTTP client for API calls
+requests>=2.31.0
+
+# YAML configuration parsing
+pyyaml>=6.0.0
+
+# Environment variable loading
+python-dotenv>=1.0.0
+
+# Note: The following are STANDARD LIBRARY and don't need installation:
+# - sqlite3 (memory database)
+# - pathlib (path handling)
+# - json (data serialization)
+# - logging (error handling)

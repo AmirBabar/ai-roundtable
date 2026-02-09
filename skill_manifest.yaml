@@ -1,0 +1,294 @@
+# AI Roundtable Skill Manifest
+# This file defines the permissions, dependencies, and behavior of the AI Roundtable skill.
+# Version: 3.0.0
+
+name: roundtable
+version: 3.0.0
+description: Multi-model AI orchestration platform for Claude Code with seven specialized collaboration modes
+
+author: AI Roundtable Contributors
+license: MIT
+repository: https://github.com/yourusername/ai-roundtable
+homepage: https://github.com/yourusername/ai-roundtable
+
+# -------------------------------------------------------------------------
+# Permissions
+# -------------------------------------------------------------------------
+# These permissions define what the skill can access and modify.
+# Claude Code enforces these permissions at runtime.
+
+permissions:
+  filesystem:
+    read:
+      - "."                    # Entire repo for context (scripts, docs, etc.)
+      - "~/.claude/memory/data/council_memory.db"  # Optional shared memory
+    write:
+      - "./build-plans/"       # Council mode output artifacts
+      - "./memory/data/"       # Optional local memory database
+      - "./dashboard/data/"    # Optional dashboard cache
+      - "./litellm/logs/"      # Optional LiteLLM logs
+
+  network:
+    enabled: false             # Core skill works offline
+    optional:
+      - description: "LiteLLM gateway for multi-model routing"
+        bind_address: "localhost:4000"
+        purpose: "Route requests to configured model APIs"
+        user_configured: true
+
+  subprocess:
+    enabled: false             # No automatic subprocess execution
+    user_initiated:
+      - description: "Start LiteLLM gateway"
+        command: "litellm --config litellm/config.yaml --port 4000"
+        optional: true
+      - description: "Start dashboard"
+        command: "python dashboard/start_dashboard.py"
+        optional: true
+
+  tools:
+    allowed:
+      - "Read"                 # Read files for context
+      - "Grep"                 # Search codebase
+      - "Glob"                 # Find files by pattern
+      - "Write"                # Write artifacts to build-plans/
+    requires_permission:
+      - "Bash"                 # Only with user approval
+      - "Skill"                # Only for invoking sub-skills
+
+# -------------------------------------------------------------------------
+# Dependencies
+# -------------------------------------------------------------------------
+# Core skill has ZERO dependencies. Optional components require installation.
+
+dependencies:
+  required: []                 # Core skill uses Claude Code native capabilities
+
+  optional:
+    - name: litellm
+      purpose: "Multi-model gateway for routing requests to different AI providers"
+      install: "pip install litellm"
+      config_required: true
+      config_file: "litellm/config.yaml"
+
+    - name: flask
+      purpose: "Web dashboard for monitoring debates and memory"
+      install: "pip install flask"
+      used_by: "dashboard/"
+
+    - name: sqlite3
+      purpose: "Persistent memory storage (built-in Python library)"
+      install: "Included with Python"
+
+# -------------------------------------------------------------------------
+# Components
+# -------------------------------------------------------------------------
+# Breakdown of skill components and their requirements.
+
+components:
+  core:
+    description: "Seven AI collaboration modes that work with Claude Code native capabilities"
+    modes:
+      - name: brainstorm
+        purpose: "Generate diverse ideas in parallel"
+        requires_gateway: false
+      - name: refine
+        purpose: "Critical review and improvement"
+        requires_gateway: false
+      - name: build-plan
+        purpose: "Create detailed build specifications"
+        requires_gateway: false
+      - name: build-review
+        purpose: "Validate completed builds"
+        requires_gateway: false
+      - name: opus-gatekeeper
+        purpose: "Cost optimization for Opus usage"
+        requires_gateway: false
+      - name: diamond-debate
+        purpose: "Complex architectural decisions (parallel workflow)"
+        requires_gateway: true
+      - name: team-debate
+        purpose: "Build specifications (sequential workflow)"
+        requires_gateway: true
+
+  optional:
+    - name: litellm-gateway
+      description: "Model routing gateway for multi-provider access"
+      status: optional
+      required_for:
+        - diamond-debate
+        - team-debate
+      graceful_degradation: "Uses Claude Code's native model when unavailable"
+
+    - name: dashboard
+      description: "Web UI for monitoring debates and memory"
+      status: optional
+      install_docs: "docs/INSTALLATION.md#dashboard"
+      dependencies: [flask]
+
+    - name: memory-subsystem
+      description: "Persistent context across sessions"
+      status: optional
+      install_docs: "docs/INSTALLATION.md#memory"
+      dependencies: []
+      graceful_degradation: "Session-only context when unavailable"
+
+# -------------------------------------------------------------------------
+# Graceful Degradation
+# -------------------------------------------------------------------------
+# How the skill behaves when optional components are missing.
+
+graceful_degradation:
+  missing_litellm:
+    behavior: "fallback_to_claude_native"
+    modes_affected:
+      - diamond-debate
+      - team-debate
+    message: "LiteLLM gateway not found. Using Claude Code native model (limited functionality)."
+
+  missing_memory:
+    behavior: "session_only_context"
+    impact: "No cross-session memory persistence"
+    message: "Memory subsystem not initialized. Context limited to current session."
+
+  missing_dashboard:
+    behavior: "cli_only"
+    impact: "No web UI available"
+    message: "Dashboard not installed. Use CLI interface."
+
+  missing_config:
+    behavior: "use_defaults"
+    config_files:
+      - litellm/config.yaml
+      - config/roundtable.yaml
+    message: "Configuration file not found. Using built-in defaults."
+
+# -------------------------------------------------------------------------
+# Security
+# -------------------------------------------------------------------------
+# Security policies and boundaries.
+
+security:
+  jail_boundary: "."           # All operations confined to repo root
+  path_validation: strict      # Enforce no path traversal attacks
+
+  data_handling:
+    telemetry: false           # No data collection
+    analytics: false           # No analytics tracking
+    local_only: true           # All data stays local
+
+  code_execution:
+    hooks_opt_in: true         # Hooks must be manually enabled
+    no_auto_start: true        # No automatic service startup
+    user_reviewed: true        # Users must review before execution
+
+# -------------------------------------------------------------------------
+# Installation
+# -------------------------------------------------------------------------
+# Installation and setup behavior.
+
+installation:
+  method: manual                # User clones repository manually
+  requires_venv: false          # Core skill works without venv
+  optional_venv: true           # Optional components recommend venv
+
+  post_install:
+    - description: "Copy configuration examples"
+      command: "cp litellm/config.yaml.example litellm/config.yaml"
+      optional: true
+    - description: "Initialize memory database"
+      command: "python memory/init_db.py"
+      optional: true
+
+  verification:
+    - description: "Run test brainstorm"
+      command: "/roundtable brainstorm test"
+      expected_output: "Prioritized ideas list"
+
+# -------------------------------------------------------------------------
+# Metadata
+# -------------------------------------------------------------------------
+# Additional metadata for skill discovery and documentation.
+
+metadata:
+  tags:
+    - multi-agent
+    - collaboration
+    - brainstorming
+    - debate
+    - build-planning
+    - code-review
+    - architecture
+
+  categories:
+    - development
+    - productivity
+    - ai-tools
+
+  compatibility:
+    claude_code_min_version: "1.0.0"
+    python_min_version: "3.8"
+    platform: "cross-platform"
+
+  documentation:
+    readme: "README.md"
+    architecture: "docs/ARCHITECTURE.md"
+    security: "docs/SECURITY.md"
+    installation: "docs/INSTALLATION.md"
+    configuration: "docs/CONFIGURATION.md"
+    troubleshooting: "docs/TROUBLESHOOTING.md"
+
+# -------------------------------------------------------------------------
+# Version History
+# -------------------------------------------------------------------------
+
+version_history:
+  - version: "3.0.0"
+    date: "2026-02-09"
+    changes:
+      - "Initial public release as ai-roundtable"
+      - "Minimalist architecture: core skill + optional components"
+      - "Comprehensive security model and documentation"
+      - "Self-contained distribution ready for GitHub"
+
+  - version: "2.1.2"
+    date: "2026-02-06"
+    changes:
+      - "Hallucination safeguards added"
+      - "Component verification requirements"
+
+  - version: "2.0.0"
+    date: "2026-01-28"
+    changes:
+      - "Diamond Architecture v2 introduced"
+      - "Parallel and sequential workflows"
+
+# -------------------------------------------------------------------------
+# Compliance
+# -------------------------------------------------------------------------
+
+compliance:
+  gdpa: "N/A - No data collection"
+  ccpa: "N/A - No data collection"
+  data_residency: "Local only - user controls all data"
+
+  licenses:
+    - name: "MIT License"
+      file: "LICENSE"
+      url: "https://opensource.org/licenses/MIT"
+
+# -------------------------------------------------------------------------
+# Contact and Support
+# -------------------------------------------------------------------------
+
+support:
+  issues: "https://github.com/yourusername/ai-roundtable/issues"
+  discussions: "https://github.com/yourusername/ai-roundtable/discussions"
+  security: "security@your-domain.com"
+
+# -------------------------------------------------------------------------
+# Manifest Version
+# -------------------------------------------------------------------------
+
+manifest_version: "1.0"
+manifest_schema: "https://skillfish.dev/schema/v1"

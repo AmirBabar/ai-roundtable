@@ -1,0 +1,56 @@
+# memory_settings.json
+# Council Memory Architecture - Configuration
+
+{
+  "database": {
+    "path": "memory/data/council_memory.db",
+    "fallback_csv": "memory/data/events_fallback.csv",
+    "wal_mode": true,
+    "cache_size_mb": 64,
+    "busy_timeout_ms": 5000
+  },
+  "scribe": {
+    "enabled": true,
+    "poll_interval_seconds": 5,
+    "batch_size": 10,
+    "max_retries": 3,
+    "llm_extraction_enabled": false,
+    "simple_extraction_rules": {
+      "user_preference": ["prefer", "like", "want", "should"],
+      "decision_made": ["decided", "approved", "rejected", "voted"],
+      "goal": ["will", "going to", "plan to", "implement"],
+      "correction": ["actually", "correction", "fix", "wrong", "not"],
+      "learned_pattern": ["notice", "observed", "tends to", "always"]
+    }
+  },
+  "categories": {
+    "auto_create": true,
+    "synthesis_interval_events": 50,
+    "synthesis_interval_minutes": 30,
+    "token_budget_per_category": 500
+  },
+  "sanitization": {
+    "enabled": true,
+    "auto_redact_pii": true,
+    "auto_redact_credentials": true,
+    "auto_redact_paths": true,
+    "block_prompt_injection": true
+  },
+  "context_injection": {
+    "timeout_ms": 100,
+    "default_fact_limit": 20,
+    "include_summaries": true,
+    "include_facts": true,
+    "format": "markdown"
+  },
+  "conflict_resolution": {
+    "strategy": "newest_wins",
+    "similarity_threshold": 0.4,
+    "enable_conflict_log": true
+  },
+  "monitoring": {
+    "log_access": true,
+    "track_performance": true,
+    "alert_slow_queries_ms": 100
+  }
+}

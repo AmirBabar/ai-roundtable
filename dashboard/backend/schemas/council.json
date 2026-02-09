@@ -1,0 +1,272 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Council Skill Configuration Schema",
+  "description": "Schema for Council skill settings with UI annotations",
+  "type": "object",
+  "properties": {
+    "defaults": {
+      "type": "object",
+      "title": "Default Settings",
+      "description": "Default behavior for Council operations",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "title": "Default Mode",
+          "description": "Default collaboration mode",
+          "enum": ["brainstorm", "refine", "build-plan", "build-review", "opus-gatekeeper", "diamond-debate", "team-debate"],
+          "ui:widget": "select",
+          "ui:options": [
+            {"value": "brainstorm", "label": "Brainstorming (fast idea generation)"},
+            {"value": "refine", "label": "Refinement (critical review)"},
+            {"value": "build-plan", "label": "Build Planning (detailed specs)"},
+            {"value": "build-review", "label": "Build Reviewer (post-build validation)"},
+            {"value": "team-debate", "label": "Team Debate (sequential 4-step)"},
+            {"value": "diamond-debate", "label": "Diamond Debate (parallel architecture)"}
+          ],
+          "ui:help": "Which Council mode to use by default"
+        },
+        "timeout": {
+          "type": "integer",
+          "title": "Default Timeout (seconds)",
+          "description": "Maximum time to wait for Council responses",
+          "minimum": 5,
+          "maximum": 600,
+          "default": 120,
+          "ui:widget": "number",
+          "ui:help": "Default timeout for Council operations (5-600 seconds)"
+        },
+        "auto_save": {
+          "type": "boolean",
+          "title": "Auto-Save Output",
+          "description": "Automatically save Council output to build-plans/",
+          "default": true,
+          "ui:widget": "confirm"
+        }
+      },
+      "required": ["mode", "timeout"]
+    },
+    "models": {
+      "type": "object",
+      "title": "Model Assignments",
+      "description": "Model assignments for each Council role",
+      "properties": {
+        "brainstorming": {
+          "type": "object",
+          "title": "Brainstorming Models",
+          "description": "Models used for parallel idea generation",
+          "properties": {
+            "models": {
+              "type": "array",
+              "title": "Generator Models",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "title": "Model ID",
+                    "ui:widget": "select",
+                    "ui:help": "Must match a model_name in LiteLLM config"
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "title": "Timeout (seconds)",
+                    "minimum": 10,
+                    "maximum": 300,
+                    "ui:widget": "number"
+                  }
+                }
+              },
+              "minItems": 1
+            },
+            "synthesizer": {
+              "type": "object",
+              "title": "Synthesizer Model",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "title": "Model ID",
+                  "ui:widget": "select"
+                },
+                "timeout": {
+                  "type": "integer",
+                  "title": "Timeout (seconds)",
+                  "minimum": 10,
+                  "maximum": 300,
+                  "ui:widget": "number"
+                }
+              }
+            }
+          }
+        },
+        "build_planning": {
+          "type": "object",
+          "title": "Build Planning Models",
+          "description": "Models for sequential 4-step workflow",
+          "properties": {
+            "architect": {
+              "type": "string",
+              "title": "Architect",
+              "description": "Designs system architecture",
+              "ui:widget": "select",
+              "ui:help": "Tier 1 model (e.g., gemini-architect)"
+            },
+            "auditor": {
+              "type": "string",
+              "title": "Auditor",
+              "description": "Critical review and security check",
+              "ui:widget": "select",
+              "ui:help": "Tier 2 model (e.g., deepseek-v3)"
+            },
+            "contextualist": {
+              "type": "string",
+              "title": "Contextualist",
+              "description": "Codebase-aware analysis",
+              "ui:widget": "select",
+              "ui:help": "Tier 3 model (e.g., kimi-researcher)"
+            },
+            "judge": {
+              "type": "string",
+              "title": "Judge",
+              "description": "Final decision maker",
+              "ui:widget": "select",
+              "ui:help": "Tier 4 model (e.g., opus-synthesis)"
+            }
+          },
+          "required": ["architect", "auditor", "contextualist", "judge"]
+        },
+        "opu_gatekeeper": {
+          "type": "object",
+          "title": "Opus Gatekeeper",
+          "description": "Cost optimization settings",
+          "properties": {
+            "max_cost_per_query": {
+              "type": "number",
+              "title": "Max Cost Per Query ($)",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 2.50,
+              "ui:widget": "number",
+              "ui:help": "Council ruling: No single query may exceed $2.50"
+            },
+            "budget_check": {
+              "type": "boolean",
+              "title": "Enable Budget Check",
+              "default": true,
+              "ui:widget": "confirm"
+            }
+          }
+        }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "title": "Council Memory Settings",
+      "description": "Configuration for Council Memory system",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "title": "Enable Memory",
+          "default": true,
+          "ui:widget": "confirm"
+        },
+        "db_path": {
+          "type": "string",
+          "title": "Database Path",
+          "default": "memory/council_memory.db",
+          "ui:widget": "input",
+          "ui:help": "Path to Council Memory SQLite database"
+        },
+        "tier": {
+          "type": "string",
+          "title": "Memory Access Tier",
+          "enum": ["SAFE", "FULL"],
+          "default": "SAFE",
+          "ui:widget": "select",
+          "ui:options": [
+            {"value": "SAFE", "label": "SAFE (decisions, preferences, guidance)"},
+            {"value": "FULL", "label": "FULL (includes error patterns)"}
+          ],
+          "ui:help": "SAFE tier excludes sensitive error patterns"
+        },
+        "semantic_search": {
+          "type": "boolean",
+          "title": "Enable Semantic Search",
+          "default": true,
+          "ui:widget": "confirm",
+          "ui:help": "Enable FTS5 semantic search in Memory"
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "title": "Hook Settings",
+      "description": "Council Memory hook configuration",
+      "properties": {
+        "sessionstart_enabled": {
+          "type": "boolean",
+          "title": "SessionStart Hook",
+          "default": true,
+          "ui:widget": "confirm",
+          "ui:help": "Inject memory context at session start"
+        },
+        "posttooluse_enabled": {
+          "type": "boolean",
+          "title": "PostToolUse Hook",
+          "default": true,
+          "ui:widget": "confirm",
+          "ui:help": "Log tool usage and capture insights"
+        },
+        "sessionend_enabled": {
+          "type": "boolean",
+          "title": "SessionEnd Hook",
+          "default": true,
+          "ui:widget": "confirm",
+          "ui:help": "Record session summary on exit"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "title": "Hook Timeout (ms)",
+          "description": "Maximum time for hook execution",
+          "minimum": 100,
+          "maximum": 10000,
+          "default": 500,
+          "ui:widget": "number",
+          "ui:help": "SessionStart hook timeout (500ms default)"
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "title": "LiteLLM Gateway Settings",
+      "description": "Connection to LiteLLM proxy server",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "title": "Use Gateway",
+          "default": true,
+          "ui:widget": "confirm"
+        },
+        "url": {
+          "type": "string",
+          "title": "Gateway URL",
+          "default": "http://localhost:4000",
+          "format": "uri",
+          "pattern": "^https?://.+",
+          "ui:widget": "input",
+          "ui:help": "LiteLLM proxy server endpoint",
+          "when": { "field": "enabled", "value": true }
+        },
+        "health_check_interval": {
+          "type": "integer",
+          "title": "Health Check Interval (seconds)",
+          "minimum": 10,
+          "maximum": 600,
+          "default": 60,
+          "ui:widget": "number",
+          "when": { "field": "enabled", "value": true }
+        }
+      }
+    }
+  },
+  "required": ["defaults"]
+}

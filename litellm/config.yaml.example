@@ -1,0 +1,165 @@
+model_list:
+  # TIER 1: Gemini Pro (Architect) - For architecture decisions, drift-check, etc.
+  - model_name: gemini-architect
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+    max_parallel_requests: 15
+    temperature: 1.0
+    max_tokens: 8192  # Raised: Architecture decisions need detailed analysis
+
+  # TIER 1 FLASH FALLBACK: Gemini Flash (fast backup)
+  # NOTE: gemini-2.0-flash-thinking-exp was removed (404), using gemini-2.5-flash
+  - model_name: gemini-flash-fallback
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+    max_parallel_requests: 20
+    timeout: 30
+    max_tokens: 500
+
+  # TIER 1 FLASH STANDARD: Gemini Flash (ultra-fast, no thinking)
+  - model_name: gemini-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+    max_parallel_requests: 25
+    timeout: 20
+    max_tokens: 400
+
+  # TIER 1 FLASH LATEST: Using gemini-2.5-flash (fast, no thinking)
+  - model_name: gemini-flash-latest
+    litellm_params:
+      model: gemini/gemini-2.5-flash-exp
+    max_parallel_requests: 25
+    timeout: 20
+    max_tokens: 500
+
+  # TIER 0: Perplexity (Grounded Web Research) - For external docs, pricing, current info
+  # NOTE: Perplexity provides cited web search, solving hallucinated URL problem
+  # SECURITY: All queries to Perplexity MUST be sanitized (remove internal identifiers)
+  # NOTE: Using perplexity provider prefix for LiteLLM integration
+  - model_name: perplexity-online
+    litellm_params:
+      model: perplexity/sonar-medium-online  # Balanced speed/depth for grounded research
+      api_key: os.environ/PERPLEXITY_API_KEY
+    max_parallel_requests: 10
+    timeout: 30
+    max_tokens: 2000  # Perplexity includes search results + citations
+
+  # TIER 0: Perplexity Researcher (Fast web lookup)
+  - model_name: perplexity-researcher
+    litellm_params:
+      model: perplexity/sonar-small-online  # Fast, cost-effective for quick lookups
+      api_key: os.environ/PERPLEXITY_API_KEY
+    max_parallel_requests: 15
+    timeout: 20
+    max_tokens: 1000
+
+  # TIER 2A: DeepSeek V3 (Fast Auditor)
+  - model_name: deepseek-v3
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+    max_parallel_requests: 10
+    timeout: 60
+    max_tokens: 4096  # Raised: Audits need more detail for comprehensive coverage
+
+  # TIER 2B: DeepSeek R1 (Deep Reasoning for Security)
+  - model_name: deepseek-security
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: os.environ/DEEPSEEK_API_KEY
+    max_parallel_requests: 10
+    timeout: 180
+    max_tokens: 4000  # Deep reasoning needs room
+
+  # TIER 3: Kimi K2 Turbo (Researcher) - Fast 60-100 t/s with thinking
+  - model_name: kimi-researcher
+    litellm_params:
+      model: moonshot/kimi-k2-thinking-turbo
+      api_key: os.environ/MOONSHOT_API_KEY
+    max_parallel_requests: 8
+    timeout: 180
+    max_tokens: 8192  # Raised: Repository analysis needs room for detailed output
+
+  # TIER 3-DEEP: Kimi K2 Thinking (Deep Analysis) - For truly deep analysis
+  - model_name: kimi-deep
+    litellm_params:
+      model: moonshot/kimi-k2-thinking
+      api_key: os.environ/MOONSHOT_API_KEY
+    max_parallel_requests: 5
+    timeout: 300
+    max_tokens: 8000  # Raised: Deep analysis requires extensive output space
+
+  # TIER 4: Kimi K2.5 (Synthesis) - Toggleable thinking, multimodal
+  - model_name: kimi-synthesis
+    litellm_params:
+      model: moonshot/kimi-k2.5
+      api_key: os.environ/MOONSHOT_API_KEY
+    max_parallel_requests: 10
+    timeout: 120
+    max_tokens: 8192  # Raised: Multi-model synthesis needs adequate space
+
+  # TIER 4: Gemini 3 Pro Semi-Final (Synthesis before Opus)
+  # Pre-synthesizes all views before Final Judge (Opus) to reduce cognitive load
+  - model_name: gemini-3-pro-semifinal
+    litellm_params:
+      model: gemini/gemini-3-pro-preview
+    max_parallel_requests: 8
+    timeout: 180
+    temperature: 1.0
+    max_tokens: 6000  # Raised: Semi-final synthesis should approach Pro levels
+
+  # TIER 4: Gemini Pro 2.5 (Synthesizer with large context)
+  # For synthesizing multiple parallel viewpoints (requires large context window)
+  - model_name: gemini-pro
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+    max_parallel_requests: 8
+    timeout: 180
+    temperature: 1.0
+    max_tokens: 8000  # Higher token limit for synthesis of multiple inputs
+
+  # TIER 4: Gemini Pro Latest (Alias using gemini-3-pro-preview)
+  - model_name: gemini-pro-latest
+    litellm_params:
+      model: gemini/gemini-3-pro-preview  # Points to latest available
+    max_parallel_requests: 8
+    timeout: 180
+    temperature: 1.0
+    max_tokens: 8000
+
+  # TIER 4.5: Claude Sonnet 4.5 (Balanced Synthesis) - Fast, high-quality
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5-20250929
+      api_key: os.environ/ANTHROPIC_API_KEY
+      api_base: "https://api.anthropic.com"
+      max_tokens: 8000  # Raised: Sonnet has 200K context, can utilize more
+    allow_model_passthrough: true
+    max_parallel_requests: 10
+    timeout: 60
+
+  # TIER 5: Claude Opus (Final Judge)
+  - model_name: opus-synthesis
+    litellm_params:
+      model: anthropic/claude-opus-4-5-20251101
+      api_key: os.environ/ANTHROPIC_API_KEY
+      api_base: "https://api.anthropic.com"
+      max_tokens: 64000
+    allow_model_passthrough: true
+    max_parallel_requests: 5
+
+# ============================================================================
+# LiteLLM Settings (Per Council: Gateway Logs Plan 2026-02-01)
+# ============================================================================
+litellm_settings:
+  # JSON logging for dashboard consumption (Council: use json_logs=true)
+  json_logs: true
+  log_file: "C:\\Users\\amirk\\.claude\\litellm\\logs\\proxy.jsonl"  # Absolute path for Windows
+
+  # Performance settings
+  set_verbose: false
+  # max_budget: 100.0  # Disabled - user will monitor manually
+  # budget_duration: "daily"  # Disabled - user will monitor manually
+
+  # Drop params to reduce log noise
+  drop_params: true  # Drop unused params like `extra_headers` in logs

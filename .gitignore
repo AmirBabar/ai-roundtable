@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.env.local
+*.env
+!.env.example
+
+# Configs (keep examples only)
+config/*.yaml
+config/*.json
+!config/*.example.yaml
+!config/*.example.json
+litellm/config.yaml
+!litellm/config.yaml.example
+
+# Data
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.log.*
+dashboard/data/*.db
+memory/data/*.db
+litellm/logs/*.jsonl
+
+# Temp/dev
+.dev/
+temp/
+tmp/
+debug/
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation builds
+docs/_build/
+site/

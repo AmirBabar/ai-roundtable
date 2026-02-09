@@ -1,0 +1,252 @@
+# Initialize-DashboardDatabase.ps1
+# Creates SQLite database for Council dashboard
+
+<#
+.SYNOPSIS
+    Initialize the Council dashboard SQLite database with all required tables
+
+.DESCRIPTION
+    Creates the database schema for tracking API calls, costs, gateway health, and model statistics.
+    Per Council decree, uses SQLite with JSON1 extension for structured storage.
+#>
+
+[CmdletBinding()]
+param(
+    [string]$DatabasePath = "$PSScriptRoot\..\..\data\dashboard.db"
+)
+
+# Ensure data directory exists
+$dataDir = Split-Path -Parent $DatabasePath
+if (-not (Test-Path $dataDir)) {
+    New-Item -Path $dataDir -ItemType Directory -Force | Out-Null
+}
+
+Write-Host "📊 Initializing Council Dashboard Database..." -ForegroundColor Cyan
+Write-Host "Database: $DatabasePath" -ForegroundColor Gray
+Write-Host ""
+
+try {
+    # For PowerShell 5.1, we'll use a simple approach with System.Data.SQLite if available
+    # Otherwise, fall back to creating SQL scripts for manual execution
+
+    $sqlScript = @"
+-- ============================================
+-- Council Dashboard Database Schema
+-- SQLite with JSON1 extension
+-- ============================================
+
+-- Table: API Call Logs
+-- Tracks all Council model API calls with cost and duration
+CREATE TABLE IF NOT EXISTS api_calls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    model TEXT NOT NULL,
+    task_type TEXT,
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    cost_usd REAL DEFAULT 0.0,
+    duration_seconds REAL,
+    status TEXT NOT NULL DEFAULT 'success',
+    error_message TEXT,
+    session_id TEXT,
+    request_id TEXT UNIQUE
+);
+
+-- Index for efficient queries
+CREATE INDEX IF NOT EXISTS idx_api_calls_timestamp ON api_calls(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_api_calls_model ON api_calls(model);
+CREATE INDEX IF NOT EXISTS idx_api_calls_task_type ON api_calls(task_type);
+CREATE INDEX IF NOT EXISTS idx_api_calls_status ON api_calls(status);
+
+-- ============================================
+
+-- Table: Gateway Health Logs
+-- Tracks LiteLLM gateway health status over time
+CREATE TABLE IF NOT EXISTS gateway_health (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    gateway_status TEXT NOT NULL,  -- 'up', 'down', 'degraded'
+    models_available TEXT,         -- JSON array of available models
+    response_time_ms REAL,
+    endpoint TEXT DEFAULT 'http://localhost:4000',
+    error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_gateway_health_timestamp ON gateway_health(timestamp DESC);
+
+-- ============================================
+
+-- Table: Model Statistics (Aggregated)
+-- Pre-computed daily statistics per model
+CREATE TABLE IF NOT EXISTS model_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    model TEXT NOT NULL,
+    call_count INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    total_cost_usd REAL DEFAULT 0.0,
+    avg_duration_seconds REAL,
+    success_count INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+    UNIQUE(date, model)
+);
+
+CREATE INDEX IF NOT EXISTS idx_model_stats_date ON model_stats(date DESC);
+CREATE INDEX IF NOT EXISTS idx_model_stats_model ON model_stats(model);
+
+-- ============================================
+
+-- Table: Budget Alerts
+-- Tracks when cost thresholds are exceeded
+CREATE TABLE IF NOT EXISTS budget_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    alert_type TEXT NOT NULL,     -- 'daily', 'weekly', 'monthly'
+    threshold_usd REAL NOT NULL,
+    actual_usd REAL NOT NULL,
+    acknowledged INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_budget_alerts_timestamp ON budget_alerts(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_budget_alerts_acknowledged ON budget_alerts(acknowledged);
+
+-- ============================================
+
+-- Table: Settings
+-- Dashboard configuration and settings
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Insert default settings
+INSERT OR IGNORE INTO settings (key, value) VALUES
+    ('daily_budget_usd', '50.0'),
+    ('weekly_budget_usd', '300.0'),
+    ('monthly_budget_usd', '1000.0'),
+    ('refresh_interval_seconds', '30'),
+    ('data_retention_days', '90');
+
+-- ============================================
+
+-- View: Today's Summary
+-- Convenient view of today's API call statistics
+CREATE VIEW IF NOT EXISTS v_today_summary AS
+SELECT
+    model,
+    task_type,
+    COUNT(*) as call_count,
+    SUM(total_tokens) as total_tokens,
+    SUM(cost_usd) as total_cost,
+    AVG(duration_seconds) as avg_duration,
+    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count,
+    SUM(CASE WHEN status != 'success' THEN 1 ELSE 0 END) as error_count
+FROM api_calls
+WHERE date(timestamp) = date('now')
+GROUP BY model, task_type;
+
+-- ============================================
+
+-- View: Current Gateway Status
+-- Latest gateway health check result
+CREATE VIEW IF NOT EXISTS v_gateway_status AS
+SELECT
+    gateway_status,
+    models_available,
+    response_time_ms,
+    timestamp as last_check
+FROM gateway_health
+ORDER BY timestamp DESC
+LIMIT 1;
+
+-- ============================================
+
+-- Triggers: Update Model Stats
+-- Automatically update model_stats when new api_calls are inserted
+CREATE TRIGGER IF NOT EXISTS trg_update_model_stats
+AFTER INSERT ON api_calls
+BEGIN
+    INSERT OR REPLACE INTO model_stats (
+        date, model, call_count, total_tokens, total_cost_usd,
+        avg_duration_seconds, success_count, error_count
+    )
+    SELECT
+        date(new.timestamp) as date,
+        new.model as model,
+        COALESCE((SELECT call_count FROM model_stats WHERE date = date(new.timestamp) AND model = new.model), 0) + 1 as call_count,
+        COALESCE((SELECT total_tokens FROM model_stats WHERE date = date(new.timestamp) AND model = new.model), 0) + new.total_tokens as total_tokens,
+        COALESCE((SELECT total_cost_usd FROM model_stats WHERE date = date(new.timestamp) AND model = new.model), 0) + new.cost_usd as total_cost_usd,
+        (SELECT avg_duration_seconds FROM model_stats WHERE date = date(new.timestamp) AND model = new.model) as avg_duration_seconds,
+        COALESCE((SELECT success_count FROM model_stats WHERE date = date(new.timestamp) AND model = new.model), 0) + CASE WHEN new.status = 'success' THEN 1 ELSE 0 END as success_count,
+        COALESCE((SELECT error_count FROM model_stats WHERE date = date(new.timestamp) AND model = new.model), 0) + CASE WHEN new.status != 'success' THEN 1 ELSE 0 END as error_count;
+END;
+"@
+
+    # Save SQL script to file for manual execution or use with sqlite3
+    $sqlScriptPath = Join-Path $dataDir "schema.sql"
+    $sqlScript | Out-File -FilePath $sqlScriptPath -Encoding UTF8
+
+    Write-Host "✓ SQL schema saved to: $sqlScriptPath" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "To initialize the database, run:" -ForegroundColor Yellow
+    Write-Host "  sqlite3 $DatabasePath < $sqlScriptPath" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Or use the Initialize-Dashboard function (coming soon)." -ForegroundColor Gray
+
+    # Try to initialize if sqlite3 is available
+    $sqliteExe = Get-Command sqlite3 -ErrorAction SilentlyContinue
+    if ($sqliteExe) {
+        Write-Host "Attempting to initialize database..." -ForegroundColor Yellow
+        $sqlContent = Get-Content $sqlScriptPath -Raw
+        $sqlContent | & sqlite3 $DatabasePath 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✓ Database initialized successfully!" -ForegroundColor Green
+        } else {
+            Write-Host "⚠ Database initialization failed. Run the SQL command manually." -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "⚠ sqlite3 not found in PATH. Using Python sqlite3..." -ForegroundColor Yellow
+        # Fallback: Use Python sqlite3
+        $pythonCmd = @"
+import sqlite3
+import sys
+
+db_path = r'$DatabasePath'
+sql_path = r'$sqlScriptPath'
+
+try:
+    with open(sql_path, 'r', encoding='utf-8') as f:
+        sql = f.read()
+
+    conn = sqlite3.connect(db_path)
+    conn.executescript(sql)
+    conn.commit()
+    conn.close()
+    print("Database initialized successfully!")
+except Exception as e:
+    print(f"Error: {e}", file=sys.stderr)
+    sys.exit(1)
+"@
+        $pythonCmd | python -
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✓ Database initialized successfully!" -ForegroundColor Green
+        }
+    }
+
+    Write-Host ""
+    Write-Host "📋 Tables created:" -ForegroundColor Cyan
+    Write-Host "  • api_calls      - Track all Council model API calls" -ForegroundColor Gray
+    Write-Host "  • gateway_health  - LiteLLM gateway status monitoring" -ForegroundColor Gray
+    Write-Host "  • model_stats     - Daily aggregated statistics" -ForegroundColor Gray
+    Write-Host "  • budget_alerts   - Cost threshold alerts" -ForegroundColor Gray
+    Write-Host "  • settings        - Dashboard configuration" -ForegroundColor Gray
+    Write-Host "  • v_today_summary  - Today's statistics view" -ForegroundColor Gray
+    Write-Host "  • v_gateway_status - Current gateway status view" -ForegroundColor Gray
+    Write-Host ""
+}
+catch {
+    Write-Host "❌ Error: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}

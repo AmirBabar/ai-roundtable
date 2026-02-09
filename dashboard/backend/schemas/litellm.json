@@ -1,0 +1,224 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LiteLLM Configuration Schema",
+  "description": "Schema for LiteLLM config.yaml with UI annotations",
+  "type": "object",
+  "properties": {
+    "model_list": {
+      "type": "array",
+      "title": "Models",
+      "description": "List of model configurations",
+      "items": {
+        "type": "object",
+        "properties": {
+          "model_name": {
+            "type": "string",
+            "title": "Model Name",
+            "description": "User-facing name for this model (used in API calls)",
+            "minLength": 1,
+            "ui:widget": "input",
+            "ui:help": "The name you use when calling the API (e.g., 'gpt-4o', 'claude-opus')"
+          },
+          "litellm_params": {
+            "type": "object",
+            "title": "LiteLLM Parameters",
+            "description": "Parameters passed to litellm.completion()",
+            "properties": {
+              "model": {
+                "type": "string",
+                "title": "Model",
+                "description": "Actual model identifier (e.g., 'openai/gpt-4o', 'anthropic/claude-opus-4-5-20251101')",
+                "minLength": 1,
+                "ui:widget": "input",
+                "ui:help": "Provider/model format (e.g., openai/gpt-4o, anthropic/claude-opus-4-5-20251101)"
+              },
+              "api_base": {
+                "type": "string",
+                "title": "API Base URL",
+                "format": "uri",
+                "ui:widget": "input",
+                "ui:help": "Custom API endpoint (optional)"
+              },
+              "api_key": {
+                "type": "string",
+                "title": "API Key",
+                "ui:widget": "secret",
+                "ui:help": "Use format: os.environ/YOUR_ENV_VAR_NAME (e.g., os.environ/OPENAI_API_KEY)",
+                "pattern": "^os\\.environ\\/.+|^$",
+                "security:env-var-only": true
+              },
+              "rpm": {
+                "type": "integer",
+                "title": "Rate Limit (RPM)",
+                "description": "Requests per minute limit",
+                "minimum": 1,
+                "ui:widget": "number",
+                "ui:help": "Rate limit for this model (requests per minute)"
+              },
+              "tpm": {
+                "type": "integer",
+                "title": "Token Limit (TPM)",
+                "description": "Tokens per minute limit",
+                "minimum": 1,
+                "ui:widget": "number"
+              },
+              "max_tokens": {
+                "type": "integer",
+                "title": "Max Tokens",
+                "description": "Maximum tokens for model responses",
+                "minimum": 1,
+                "ui:widget": "number"
+              },
+              "temperature": {
+                "type": "number",
+                "title": "Temperature",
+                "minimum": 0,
+                "maximum": 2,
+                "ui:widget": "number"
+              },
+              "timeout": {
+                "type": "integer",
+                "title": "Timeout (seconds)",
+                "minimum": 1,
+                "maximum": 600,
+                "ui:widget": "number"
+              }
+            }
+          },
+          "max_parallel_requests": {
+            "type": "integer",
+            "title": "Max Parallel Requests",
+            "minimum": 1,
+            "ui:widget": "number"
+          },
+          "model_info": {
+            "type": "object",
+            "title": "Model Info",
+            "properties": {
+              "supported_environments": {
+                "type": "array",
+                "title": "Supported Environments",
+                "items": {
+                  "type": "string",
+                  "enum": ["production", "staging", "development"]
+                },
+                "ui:widget": "multiselect"
+              }
+            }
+          }
+        },
+        "required": ["model_name", "litellm_params"]
+      }
+    },
+    "litellm_settings": {
+      "type": "object",
+      "title": "LiteLLM Settings",
+      "description": "Module-level LiteLLM configuration",
+      "properties": {
+        "drop_params": {
+          "type": "boolean",
+          "title": "Drop Unused Params",
+          "ui:widget": "confirm",
+          "ui:help": "Drop parameters not supported by the model"
+        },
+        "set_verbose": {
+          "type": "boolean",
+          "title": "Verbose Logging",
+          "ui:widget": "confirm"
+        },
+        "num_retries": {
+          "type": "integer",
+          "title": "Number of Retries",
+          "minimum": 0,
+          "maximum": 10,
+          "ui:widget": "number"
+        },
+        "request_timeout": {
+          "type": "integer",
+          "title": "Request Timeout (seconds)",
+          "minimum": 1,
+          "maximum": 600,
+          "ui:widget": "number"
+        },
+        "cache": {
+          "type": "string",
+          "title": "Cache Type",
+          "ui:widget": "select",
+          "ui:options": ["", "simple", "redis"],
+          "ui:help": "Enable response caching"
+        }
+      }
+    },
+    "router_settings": {
+      "type": "object",
+      "title": "Router Settings",
+      "description": "Load balancing and routing configuration",
+      "properties": {
+        "routing_strategy": {
+          "type": "string",
+          "title": "Routing Strategy",
+          "enum": ["simple-shuffle", "least-busy", "usage-based-routing", "latency-based-routing"],
+          "ui:widget": "select",
+          "ui:options": [
+            {"value": "simple-shuffle", "label": "Simple Shuffle (default)"},
+            {"value": "least-busy", "label": "Least Busy"},
+            {"value": "usage-based-routing", "label": "Usage Based"},
+            {"value": "latency-based-routing", "label": "Latency Based"}
+          ],
+          "ui:help": "How to distribute load across multiple model instances"
+        },
+        "model_group_alias": {
+          "type": "object",
+          "title": "Model Group Aliases",
+          "description": "Map group names to specific model names",
+          "ui:widget": "editor",
+          "ui:help": "JSON mapping of model aliases (e.g., {\"gpt-4\": \"gpt-4o\"})"
+        },
+        "num_retries": {
+          "type": "integer",
+          "title": "Retries",
+          "minimum": 0,
+          "maximum": 5,
+          "ui:widget": "number"
+        },
+        "timeout": {
+          "type": "integer",
+          "title": "Timeout (seconds)",
+          "minimum": 1,
+          "maximum": 600,
+          "ui:widget": "number"
+        }
+      }
+    },
+    "general_settings": {
+      "type": "object",
+      "title": "General Settings",
+      "description": "Server-wide configuration",
+      "properties": {
+        "master_key": {
+          "type": "string",
+          "title": "Master Key",
+          "ui:widget": "secret",
+          "ui:help": "Global authentication key (optional, use os.environ/MASTER_KEY)",
+          "pattern": "^os\\.environ\\/.+|^$",
+          "security:env-var-only": true
+        },
+        "database_connection_pool_limit": {
+          "type": "integer",
+          "title": "DB Pool Limit",
+          "minimum": 1,
+          "maximum": 100,
+          "ui:widget": "number"
+        },
+        "database_connection_timeout": {
+          "type": "integer",
+          "title": "DB Connection Timeout (seconds)",
+          "minimum": 1,
+          "maximum": 300,
+          "ui:widget": "number"
+        }
+      }
+    }
+  },
+  "required": ["model_list"]
+}
