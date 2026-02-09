@@ -1,0 +1,237 @@
+# AI Roundtable Model Configuration
+# Copy this file to config/models.yaml and customize for your needs
+#
+# This file defines which AI models to use for each collaboration mode
+#
+# Installation:
+#   cp config/models.yaml.example config/models.yaml
+
+# =============================================================================
+# Model Definitions
+# =============================================================================
+# Define the models available in your LiteLLM gateway configuration
+# These must match the model_name in litellm/config.yaml
+
+models:
+  # Fast, cost-effective models for ideation
+  kimi-researcher:
+    provider: "moonshot"
+    model: "moonshot-v1-auto"
+    tier: 3
+    timeout: 60
+    description: "Cost-effective with thinking capabilities"
+
+  gemini-flash:
+    provider: "google"
+    model: "gemini-2.5-flash-exp"
+    tier: 3
+    timeout: 60
+    description: "Fast ideation"
+
+  deepseek-v3:
+    provider: "deepseek"
+    model: "deepseek-chat"
+    tier: 2
+    timeout: 180
+    description: "Deep reasoning and analysis"
+
+  claude-haiku:
+    provider: "anthropic"
+    model: "claude-3-5-haiku-20241022"
+    tier: 3
+    timeout: 60
+    description: "Fast and lightweight"
+
+  claude-sonnet:
+    provider: "anthropic"
+    model: "claude-3-5-sonnet-20241022"
+    tier: 2
+    timeout: 180
+    description: "Balanced performance"
+
+  claude-sonnet-4:
+    provider: "anthropic"
+    model: "claude-sonnet-4-20250514"
+    tier: 2
+    timeout: 180
+    description: "Latest Sonnet model"
+
+  claude-opus-4:
+    provider: "anthropic"
+    model: "claude-opus-4-20250514"
+    tier: 1
+    timeout: 300
+    description: "Highest quality, highest cost"
+
+  gemini-pro:
+    provider: "google"
+    model: "gemini-2.5-pro"
+    tier: 2
+    timeout: 180
+    description: "Google's flagship model"
+
+  kimi-synthesis:
+    provider: "moonshot"
+    model: "moonshot-v1-8k"
+    tier: 3
+    timeout: 90
+    description: "Synthesis and summarization"
+
+  opus-synthesis:
+    provider: "anthropic"
+    model: "claude-opus-4-20250514"
+    tier: 1
+    timeout: 300
+    description: "Final synthesis and judgment"
+
+  gemini-architect:
+    provider: "google"
+    model: "gemini-2.5-pro"
+    tier: 2
+    timeout: 120
+    description: "System architecture design"
+
+# =============================================================================
+# Mode-Specific Model Assignments
+# =============================================================================
+
+mode_assignments:
+  # Brainstorming Mode - Parallel ideation
+  brainstorm:
+    parallel_models:
+      - "kimi-researcher"
+      - "deepseek-v3"
+      - "gemini-flash"
+    synthesizer: "claude-sonnet-4"
+    max_ideas: 20
+
+  # Refinement Mode - Sequential improvement
+  refine:
+    sequential_models:
+      - model: "kimi-synthesis"
+        role: "Draft and initial review"
+      - model: "claude-sonnet-4"
+        role: "Critique, expand, and improve"
+      - model: "opus-synthesis"
+        role: "Final polish and approval"
+
+  # Build Planning Mode - Four-step workflow
+  build_plan:
+    sequential_models:
+      - model: "kimi-researcher"
+        role: "Cost Architect"
+        instructions:
+          - "Design system architecture"
+          - "Identify key components"
+          - "Consider cost-effectiveness"
+      - model: "deepseek-v3"
+        role: "Auditor - CRITICAL REVIEW"
+        instructions:
+          - "Security risks"
+          - "Compatibility issues"
+          - "Technical risks"
+      - model: "claude-sonnet-4"
+        role: "Contextualist"
+        instructions:
+          - "Check existing patterns"
+          - "Integration points"
+          - "Dependencies"
+      - model: "gemini-pro"
+        role: "Semi-Final Judge"
+        instructions:
+          - "Incorporate all views"
+          - "Recommend approval path"
+      - model: "opus-synthesis"
+        role: "Final Judge"
+        instructions:
+          - "FINAL DECISION"
+          - "Issue decree"
+
+  # Build Reviewer Mode
+  build_review:
+    reviewer: "deepseek-v3"
+    strictness: "standard"
+
+  # Opus Gatekeeper Mode
+  opus_gatekeeper:
+    gatekeeper: "claude-opus-4"
+    max_budget: 1.00
+
+  # Diamond Debate Mode - Parallel architecture
+  diamond_debate:
+    stage1_context_gathering:
+      - "kimi-researcher"
+      - "perplexity-online"
+    stage2_deliberation:
+      - "deepseek-v3"
+      - "gemini-flash"
+      - "claude-sonnet-4"
+    stage3_synthesis: "gemini-pro"
+    stage4_ratification: "claude-opus-4"
+
+  # Team Debate Mode (alias for build-plan)
+  team_debate:
+    inherit_from: "build_plan"
+
+# =============================================================================
+# Fallback Configuration
+# =============================================================================
+
+fallback:
+  # What to use when LiteLLM is unavailable
+  default_fallback: "claude-sonnet-4"
+
+  # Model-specific fallbacks
+  fallback_map:
+    "gemini-flash": "claude-haiku"
+    "deepseek-v3": "claude-sonnet-4"
+    "claude-opus-4": "claude-sonnet-4"
+    "kimi-researcher": "claude-haiku"
+
+# =============================================================================
+# Cost Optimization
+# =============================================================================
+
+cost_optimization:
+  # Maximum cost per collaboration mode (in USD)
+  max_costs:
+    brainstorm: 0.10
+    refine: 0.30
+    build_plan: 0.50
+    build_review: 0.15
+    diamond_debate: 0.50
+    team_debate: 0.40
+
+  # Prefer lower-tier models when appropriate
+  prefer_tier3_for:
+    - "brainstorm"
+    - "ideation"
+    - "drafting"
+
+# =============================================================================
+# Quality Settings
+# =============================================================================
+
+quality:
+  # Minimum tier for critical decisions
+  critical_min_tier: 2
+
+  # Require verification for high-impact decisions
+  verification_required:
+    - "architectural decision"
+    - "security review"
+    - "api design"
+
+# =============================================================================
+# Experimental Features
+# =============================================================================
+
+experimental:
+  # Enable model routing based on query type
+  smart_routing: false
+
+  # Enable cost-based model selection
+  cost_based_selection: false
+
+  # Enable quality-based model selection
+  quality_based_selection: true

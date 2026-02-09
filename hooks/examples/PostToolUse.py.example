@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+"""
+AI Roundtable - PostToolUse Hook Example
+
+This hook runs after each tool execution.
+It demonstrates how to capture tool results and update memory.
+
+To enable:
+1. Review this code to understand what it does
+2. Copy to ~/.claude/hooks/PostToolUse.py
+3. Customize the configuration below
+
+Security: This hook only reads tool results. It does not modify
+the results or perform any write operations.
+"""
+
+import json
+import sqlite3
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+# Enable this hook (set to False to disable without deleting)
+ENABLED = False
+
+# Log file location (relative to home directory)
+LOG_FILE = "~/.claude/logs/tool_results.log"
+
+# Memory database path (relative to home directory)
+MEMORY_DB_PATH = "~/.claude/memory/data/council_memory.db"
+
+# Tools to track results for (empty = track all)
+TRACKED_TOOLS = ["Write", "Edit", "Bash"]
+
+# =============================================================================
+# Logging Functions
+# =============================================================================
+
+def get_log_path() -> Path:
+    """Get the resolved path to the log file."""
+    return Path(LOG_FILE).expanduser()
+
+
+def log_tool_result(tool_name: str, arguments: dict, result: any, error: Optional[str]) -> None:
+    """
+    Log tool result to file.
+
+    Args:
+        tool_name: Name of the tool that was called
+        arguments: Tool arguments
+        result: Tool result (if successful)
+        error: Error message (if failed)
+    """
+    try:
+        log_path = get_log_path()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().isoformat()
+
+        # Determine status
+        status = "success" if error is None else "error"
+
+        # Sanitize result for logging
+        result_str = str(result)
+        if len(result_str) > 500:
+            result_str = result_str[:500] + "..."
+
+        log_entry = {
+            "timestamp": timestamp,
+            "tool": tool_name,
+            "arguments": arguments,
+            "status": status,
+            "result": result_str if error is None else None,
+            "error": error
+        }
+
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry) + "\n")
+
+    except Exception as e:
+        # Silent fail - logging errors shouldn't break the hook
+        pass
+
+
+def should_track_tool(tool_name: str) -> bool:
+    """
+    Check if a tool's results should be tracked.
+
+    Args:
+        tool_name: Name of the tool
+
+    Returns:
+        True if tool should be tracked
+    """
+    if not TRACKED_TOOLS:
+        return True
+    return tool_name in TRACKED_TOOLS
+
+
+# =============================================================================
+# Memory Update Functions (Optional)
+# =============================================================================
+
+def get_memory_db_path() -> Path:
+    """Get the resolved path to the memory database."""
+    return Path(MEMORY_DB_PATH).expanduser()
+
+
+def database_exists() -> bool:
+    """Check if the memory database exists."""
+    return get_memory_db_path().exists()
+
+
+def record_insight(title: str, content: str, tags: list = None) -> bool:
+    """
+    Record an insight to memory (optional enhancement).
+
+    Args:
+        title: Insight title
+        content: Insight content
+        tags: Optional tags
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not database_exists():
+        return False
+
+    try:
+        db_path = get_memory_db_path()
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+
+        # Check if insights table exists
+        cursor.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='insights'"
+        )
+
+        if not cursor.fetchone():
+            conn.close()
+            return False
+
+        # Insert insight
+        tags_str = ",".join(tags) if tags else None
+        cursor.execute(
+            "INSERT INTO insights (title, content, tags, tier, actor) "
+            "VALUES (?, ?, ?, 2, 'system')",
+            (title, content, tags_str)
+        )
+
+        conn.commit()
+        conn.close()
+        return True
+
+    except Exception:
+        return False
+
+
+# =============================================================================
+# Hook Entry Point
+# =============================================================================
+
+def post_tool_use_hook(tool_name: str, arguments: dict, result: any, error: Optional[str]) -> Optional[str]:
+    """
+    PostToolUse hook entry point.
+
+    Args:
+        tool_name: Name of the tool that was called
+        arguments: Tool arguments
+        result: Tool result (if successful)
+        error: Error message (if failed)
+
+    Returns:
+        Message to display or None
+    """
+    if not ENABLED:
+        return None
+
+    # Log tool result
+    if should_track_tool(tool_name):
+        log_tool_result(tool_name, arguments, result, error)
+
+    # Optional: Record insights for specific tool patterns
+    if error is None and tool_name in ["Write", "Edit"]:
+        # Could extract insights from successful writes
+        # For example: "User created new file X"
+        pass
+
+    return None
+
+
+# =============================================================================
+# Claude Code Hook Interface
+# =============================================================================
+
+def on_post_tool_use(tool_name: str, arguments: dict, result: any, error: Optional[str]) -> Optional[str]:
+    """
+    Called by Claude Code after each tool execution.
+
+    Args:
+        tool_name: Name of the tool that was called
+        arguments: Tool arguments
+        result: Tool result (if successful)
+        error: Error message (if failed)
+
+    Returns:
+        Message to display or None
+    """
+    try:
+        return post_tool_use_hook(tool_name, arguments, result, error)
+    except Exception as e:
+        # Never let hook errors break the session
+        error_msg = f"<!-- AI Roundtable PostToolUse hook error: {e} -->"
+        return error_msg
+
+
+# For manual testing
+if __name__ == "__main__":
+    print("AI Roundtable PostToolUse Hook Example")
+    print(f"Log file: {get_log_path()}")
+    print(f"Memory DB: {get_memory_db_path()}")
+    print(f"Memory DB exists: {database_exists()}")
+
+    # Test logging
+    test_args = {"path": "/tmp/test.txt", "content": "Hello World"}
+    test_result = "File written successfully"
+    result = post_tool_use_hook("Write", test_args, test_result, None)
+    print(f"Hook result: {result}")
+
+    print("\nTool result logged successfully")

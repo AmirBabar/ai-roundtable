@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""
+AI Roundtable - PreToolUse Hook Example
+
+This hook runs before each tool execution.
+It demonstrates how to log and validate tool usage.
+
+To enable:
+1. Review this code to understand what it does
+2. Copy to ~/.claude/hooks/PreToolUse.py
+3. Customize the configuration below
+
+Security: This hook only logs and validates. It does not modify
+tool parameters or block execution.
+"""
+
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+# Enable this hook (set to False to disable without deleting)
+ENABLED = False
+
+# Log file location (relative to home directory)
+LOG_FILE = "~/.claude/logs/tool_usage.log"
+
+# Tools to log (empty = log all tools)
+LOGGED_TOOLS = []
+
+# Tools that require confirmation (empty = no confirmation)
+REQUIRE_CONFIRMATION = []
+
+# =============================================================================
+# Logging Functions
+# =============================================================================
+
+def get_log_path() -> Path:
+    """Get the resolved path to the log file."""
+    return Path(LOG_FILE).expanduser()
+
+
+def log_tool_use(tool_name: str, arguments: dict) -> None:
+    """
+    Log tool usage to file.
+
+    Args:
+        tool_name: Name of the tool being called
+        arguments: Tool arguments (sanitized)
+    """
+    try:
+        log_path = get_log_path()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().isoformat()
+
+        # Sanitize arguments for logging (remove sensitive data)
+        sanitized_args = sanitize_arguments(arguments)
+
+        log_entry = {
+            "timestamp": timestamp,
+            "tool": tool_name,
+            "arguments": sanitized_args
+        }
+
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"{log_entry}\n")
+
+    except Exception as e:
+        # Silent fail - logging errors shouldn't block tool execution
+        pass
+
+
+def sanitize_arguments(arguments: dict) -> dict:
+    """
+    Sanitize arguments for logging (remove sensitive data).
+
+    Args:
+        arguments: Original arguments
+
+    Returns:
+        Sanitized arguments dictionary
+    """
+    sensitive_keys = [
+        "api_key", "token", "password", "secret",
+        "credential", "auth", "private_key"
+    ]
+
+    sanitized = {}
+    for key, value in arguments.items():
+        if any(sensitive in key.lower() for sensitive in sensitive_keys):
+            sanitized[key] = "***REDACTED***"
+        elif isinstance(value, str) and len(value) > 200:
+            sanitized[key] = value[:200] + "..."
+        else:
+            sanitized[key] = value
+
+    return sanitized
+
+
+def should_log_tool(tool_name: str) -> bool:
+    """
+    Check if a tool should be logged.
+
+    Args:
+        tool_name: Name of the tool
+
+    Returns:
+        True if tool should be logged
+    """
+    if not LOGGED_TOOLS:
+        return True
+    return tool_name in LOGGED_TOOLS
+
+
+def requires_confirmation(tool_name: str) -> bool:
+    """
+    Check if a tool requires confirmation.
+
+    Args:
+        tool_name: Name of the tool
+
+    Returns:
+        True if tool requires confirmation
+    """
+    return tool_name in REQUIRE_CONFIRMATION
+
+
+# =============================================================================
+# Hook Entry Point
+# =============================================================================
+
+def pre_tool_use_hook(tool_name: str, arguments: dict) -> Optional[str]:
+    """
+    PreToolUse hook entry point.
+
+    Args:
+        tool_name: Name of the tool being called
+        arguments: Tool arguments
+
+    Returns:
+        Warning message or None (if no warnings)
+    """
+    if not ENABLED:
+        return None
+
+    # Log tool usage
+    if should_log_tool(tool_name):
+        log_tool_use(tool_name, arguments)
+
+    # Check for confirmation requirement
+    if requires_confirmation(tool_name):
+        return f"⚠️ Tool '{tool_name}' requires confirmation."
+
+    return None
+
+
+# =============================================================================
+# Claude Code Hook Interface
+# =============================================================================
+
+def on_pre_tool_use(tool_name: str, arguments: dict) -> Optional[str]:
+    """
+    Called by Claude Code before each tool execution.
+
+    Args:
+        tool_name: Name of the tool being called
+        arguments: Tool arguments
+
+    Returns:
+        Warning message or None (if no warnings)
+    """
+    try:
+        return pre_tool_use_hook(tool_name, arguments)
+    except Exception as e:
+        # Never let hook errors block tool execution
+        error_msg = f"<!-- AI Roundtable PreToolUse hook error: {e} -->"
+        return error_msg
+
+
+# For manual testing
+if __name__ == "__main__":
+    print("AI Roundtable PreToolUse Hook Example")
+    print(f"Log file: {get_log_path()}")
+
+    # Test logging
+    test_args = {"path": "/tmp/test", "content": "Hello World"}
+    result = pre_tool_use_hook("Write", test_args)
+    print(f"Hook result: {result}")
+
+    print("\nTool usage logged successfully")

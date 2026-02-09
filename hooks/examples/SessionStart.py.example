@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""
+AI Roundtable - SessionStart Hook Example
+
+This hook runs at the start of each Claude Code session.
+It demonstrates how to integrate AI Roundtable's memory subsystem
+for cross-session continuity.
+
+To enable:
+1. Review this code to understand what it does
+2. Copy to ~/.claude/hooks/SessionStart.py
+3. Customize the configuration below
+
+Security: This hook only reads from the memory database.
+It does not write, modify, or transmit any data.
+"""
+
+import os
+import sqlite3
+from pathlib import Path
+from typing import Optional
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+# Enable this hook (set to False to disable without deleting)
+ENABLED = False
+
+# Memory database path (relative to home directory)
+MEMORY_DB_PATH = "~/.claude/memory/data/council_memory.db"
+
+# Maximum previous sessions to show
+MAX_PREVIOUS_SESSIONS = 3
+
+# Maximum insights to inject
+MAX_INSIGHTS = 5
+
+# =============================================================================
+# Memory Retrieval Functions
+# =============================================================================
+
+def get_memory_db_path() -> Path:
+    """Get the resolved path to the memory database."""
+    return Path(MEMORY_DB_PATH).expanduser()
+
+
+def database_exists() -> bool:
+    """Check if the memory database exists."""
+    return get_memory_db_path().exists()
+
+
+def get_previous_session_summary(session_id: str) -> Optional[str]:
+    """
+    Get a summary of the previous session.
+
+    Args:
+        session_id: Current session ID
+
+    Returns:
+        Summary text or None if unavailable
+    """
+    if not database_exists():
+        return None
+
+    try:
+        db_path = get_memory_db_path()
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Get most recent session
+        cursor.execute(
+            "SELECT session_id, focus_area, session_type, ended_at "
+            "FROM sessions "
+            "WHERE session_id != ? AND ended_at IS NOT NULL "
+            "ORDER BY ended_at DESC "
+            "LIMIT 1",
+            (session_id,)
+        )
+
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return None
+
+        summary_parts = []
+        if row['focus_area']:
+            summary_parts.append(f"**Focus:** {row['focus_area']}")
+        if row['session_type']:
+            summary_parts.append(f"**Type:** {row['session_type']}")
+
+        return "\n".join(summary_parts) if summary_parts else None
+
+    except Exception as e:
+        # Silent fail - hook errors shouldn't block session start
+        print(f"<!-- AI Roundtable: Memory retrieval failed: {e} -->")
+        return None
+
+
+def get_recent_insights(limit: int = 5) -> list:
+    """
+    Get recent insights from memory.
+
+    Args:
+        limit: Maximum number of insights to return
+
+    Returns:
+        List of insight dictionaries
+    """
+    if not database_exists():
+        return []
+
+    try:
+        db_path = get_memory_db_path()
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Check if insights table exists
+        cursor.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='insights'"
+        )
+
+        if not cursor.fetchone():
+            return []
+
+        # Get recent insights
+        cursor.execute(
+            "SELECT title, content, tags "
+            "FROM insights "
+            "WHERE tier <= 2 "  # Only CRITICAL and SAFE tier
+            "ORDER BY created_at DESC "
+            "LIMIT ?",
+            (limit,)
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "title": row['title'],
+                "content": row['content'][:200] + "..." if len(row['content']) > 200 else row['content'],
+                "tags": row['tags'].split(",") if row['tags'] else []
+            }
+            for row in rows
+        ]
+
+    except Exception as e:
+        print(f"<!-- AI Roundtable: Insight retrieval failed: {e} -->")
+        return []
+
+
+# =============================================================================
+# Hook Entry Point
+# =============================================================================
+
+def session_start_hook(session_id: str, context: dict) -> str:
+    """
+    SessionStart hook entry point.
+
+    Args:
+        session_id: Current session identifier
+        context: Session context dictionary
+
+    Returns:
+        Additional context to inject into the session
+    """
+    if not ENABLED:
+        return ""
+
+    additions = []
+
+    # Add previous session summary
+    previous_summary = get_previous_session_summary(session_id)
+    if previous_summary:
+        additions.append(f"## Previous Session\n{previous_summary}")
+
+    # Add recent insights
+    insights = get_recent_insights(MAX_INSIGHTS)
+    if insights:
+        additions.append("## Recent Insights")
+        for insight in insights:
+            tag_str = f" [{', '.join(insight['tags'])}]" if insight['tags'] else ""
+            additions.append(f"- **{insight['title']}**{tag_str}: {insight['content']}")
+
+    return "\n\n".join(additions)
+
+
+# =============================================================================
+# Claude Code Hook Interface
+# =============================================================================
+
+# This function is called by Claude Code at session start
+def on_session_start(session_id: str, context: dict) -> str:
+    """
+    Called by Claude Code at the start of each session.
+
+    Returns:
+        Additional context to inject (empty string if nothing to add)
+    """
+    try:
+        return session_start_hook(session_id, context)
+    except Exception as e:
+        # Never let hook errors crash the session
+        error_msg = f"<!-- AI Roundtable SessionStart hook error: {e} -->"
+        return error_msg
+
+
+# For manual testing
+if __name__ == "__main__":
+    print("AI Roundtable SessionStart Hook Example")
+    print(f"Database: {get_memory_db_path()}")
+    print(f"Database exists: {database_exists()}")
+
+    if database_exists():
+        print("\nPrevious Session Summary:")
+        print(get_previous_session_summary("test-session"))
+
+        print("\nRecent Insights:")
+        insights = get_recent_insights(3)
+        for insight in insights:
+            print(f"  - {insight['title']}")

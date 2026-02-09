@@ -1,0 +1,259 @@
+# AI Roundtable Configuration
+# Copy this file to config/roundtable.yaml and customize for your needs
+#
+# This file controls the behavior of AI Roundtable's collaboration modes
+#
+# Installation:
+#   cp config/roundtable.example.yaml config/roundtable.yaml
+
+# =============================================================================
+# General Settings
+# =============================================================================
+
+general:
+  # Default timeout for AI model calls (milliseconds)
+  default_timeout: 120000
+
+  # Whether to save all build plans to build-plans/ directory
+  save_artifacts: true
+
+  # Verbose logging (useful for debugging)
+  verbose: false
+
+  # Default mode to use when auto-detection is uncertain
+  fallback_mode: "brainstorm"
+
+# =============================================================================
+# LiteLLM Gateway Settings
+# =============================================================================
+
+litellm:
+  # Enable LiteLLM gateway for multi-model routing
+  # If false, uses Claude Code's native model (fallback mode)
+  enabled: false
+
+  # Gateway location
+  host: "localhost"
+  port: 4000
+
+  # Configuration file location
+  config_path: "litellm/config.yaml"
+
+  # Auto-start gateway if not running (experimental)
+  auto_start: false
+
+# =============================================================================
+# Mode-Specific Settings
+# =============================================================================
+
+modes:
+  # Brainstorming Mode
+  brainstorm:
+    # Number of ideas to generate per model
+    ideas_per_model: 10
+
+    # Models to use (if LiteLLM enabled)
+    models:
+      - "gemini-flash"
+      - "deepseek-chat"
+      - "claude-haiku"
+
+    # Synthesizer model
+    synthesizer: "claude-sonnet-4"
+
+  # Refinement Mode
+  refine:
+    # Number of refinement passes
+    passes: 3
+
+    # Quality gate strictness (1-5, higher = stricter)
+    quality_gate_level: 3
+
+    # Models for each pass
+    models:
+      - "claude-haiku"
+      - "claude-sonnet-4"
+      - "claude-opus-4"
+
+  # Build Planning Mode
+  build_plan:
+    # Architect model
+    architect: "gemini-architect"
+
+    # Auditor model (critical review)
+    auditor: "deepseek-v3"
+
+    # Contextualist model (codebase integration)
+    contextualist: "kimi-researcher"
+
+    # Judge model (final decision)
+    judge: "opus-synthesis"
+
+    # Enable verification requirements
+    require_verification: true
+
+  # Build Reviewer Mode
+  build_review:
+    # Reviewer model
+    reviewer: "deepseek-v3"
+
+    # Pass/fail criteria strictness
+    strictness: "standard"  # options: lenient, standard, strict
+
+  # Opus Gatekeeper Mode
+  opus_gatekeeper:
+    # Maximum budget per Opus call (in USD)
+    max_budget: 1.00
+
+    # Categories that ALWAYS require Opus
+    mandatory_categories:
+      - "architectural decision"
+      - "security review"
+      - "critical bug fix"
+
+  # Diamond Debate Mode
+  diamond_debate:
+    # Stage 1: Context gathering models
+    stage1_models:
+      - "kimi-researcher"
+      - "perplexity-online"
+
+    # Stage 2: Deliberation models
+    stage2_models:
+      - "deepseek-v3"
+      - "gemini-flash"
+      - "claude-sonnet-4"
+
+    # Stage 3: Semi-final synthesis
+    stage3_model: "gemini-pro"
+
+    # Stage 4: Final ratification (conditional)
+    stage4_model: "claude-opus-4"
+
+    # Require ratification only if disagreement exists
+    conditional_ratification: true
+
+  # Team Debate Mode (alias for build-plan)
+  team_debate:
+    # Uses same configuration as build_plan
+    inherit_from: "build_plan"
+
+# =============================================================================
+# Memory Subsystem Settings
+# =============================================================================
+
+memory:
+  # Enable persistent memory across sessions
+  enabled: false
+
+  # Database location
+  db_path: "memory/data/council_memory.db"
+
+  # Memory tier (CRITICAL, SAFE, FULL)
+  # CRITICAL: Core constraints only
+  # SAFE: Decisions and preferences (default)
+  # FULL: Everything including error patterns
+  default_tier: "SAFE"
+
+  # Context injection (add memory to Council prompts)
+  inject_context: true
+
+  # Maximum context items to inject
+  max_context_items: 10
+
+# =============================================================================
+# Dashboard Settings
+# =============================================================================
+
+dashboard:
+  # Enable web dashboard
+  enabled: false
+
+  # Dashboard server settings
+  host: "localhost"
+  port: 5000
+
+  # Auto-open browser on start
+  auto_open: true
+
+  # Update frequency (milliseconds)
+  update_interval: 1000
+
+# =============================================================================
+# Path Settings
+# =============================================================================
+
+paths:
+  # Where to save build plan artifacts
+  build_plans_dir: "build-plans"
+
+  # Where to store memory database
+  memory_data_dir: "memory/data"
+
+  # Where to store dashboard cache
+  dashboard_data_dir: "dashboard/data"
+
+  # Where LiteLLM stores logs
+  litellm_logs_dir: "litellm/logs"
+
+# =============================================================================
+# Security Settings
+# =============================================================================
+
+security:
+  # Enforce path jail (prevent directory traversal)
+  enforce_jail: true
+
+  # Allowed file operations
+  allow_read: true
+  allow_write: true
+
+  # Write restrictions (only these directories)
+  write_allowed_dirs:
+    - "build-plans"
+    - "memory/data"
+    - "dashboard/data"
+    - "litellm/logs"
+
+  # Network access (default: none)
+  allow_network: false
+
+  # Subprocess execution (default: none)
+  allow_subprocess: false
+
+# =============================================================================
+# Model Fallback Settings
+# =============================================================================
+
+fallback:
+  # What to do when LiteLLM is unavailable
+  on_litellm_unavailable: "use_claude_native"  # options: error, use_claude_native, warn
+
+  # What to do when a specific model fails
+  on_model_failure: "skip_and_continue"  # options: error, skip_and_continue, use_fallback
+
+  # Fallback model mapping
+  fallback_models:
+    "gemini-flash": "claude-haiku"
+    "deepseek-v3": "claude-sonnet-4"
+    "claude-opus-4": "claude-sonnet-4"
+
+# =============================================================================
+# Logging Settings
+# =============================================================================
+
+logging:
+  # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  level: "INFO"
+
+  # Log file location (empty = stdout only)
+  file: ""
+
+  # Log format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+  # Include model calls in logs
+  log_model_calls: true
+
+  # Include timestamps in logs
+  log_timestamps: true
